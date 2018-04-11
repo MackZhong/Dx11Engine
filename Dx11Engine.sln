@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.27428.2027
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Engine", "Engine\Engine.vcxproj", "{3699430F-DA71-4E86-951A-245C9D7BCBEB}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MowModelViewer", "MowModelViewer\MowModelViewer.vcxproj", "{1ADF17C7-9651-4590-A2D1-924EC030E806}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -21,6 +23,14 @@ Global
 		{3699430F-DA71-4E86-951A-245C9D7BCBEB}.Release|Win32.Build.0 = Release|Win32
 		{3699430F-DA71-4E86-951A-245C9D7BCBEB}.Release|x64.ActiveCfg = Release|x64
 		{3699430F-DA71-4E86-951A-245C9D7BCBEB}.Release|x64.Build.0 = Release|x64
+		{1ADF17C7-9651-4590-A2D1-924EC030E806}.Debug|Win32.ActiveCfg = Debug|Win32
+		{1ADF17C7-9651-4590-A2D1-924EC030E806}.Debug|Win32.Build.0 = Debug|Win32
+		{1ADF17C7-9651-4590-A2D1-924EC030E806}.Debug|x64.ActiveCfg = Debug|x64
+		{1ADF17C7-9651-4590-A2D1-924EC030E806}.Debug|x64.Build.0 = Debug|x64
+		{1ADF17C7-9651-4590-A2D1-924EC030E806}.Release|Win32.ActiveCfg = Release|Win32
+		{1ADF17C7-9651-4590-A2D1-924EC030E806}.Release|Win32.Build.0 = Release|Win32
+		{1ADF17C7-9651-4590-A2D1-924EC030E806}.Release|x64.ActiveCfg = Release|x64
+		{1ADF17C7-9651-4590-A2D1-924EC030E806}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
