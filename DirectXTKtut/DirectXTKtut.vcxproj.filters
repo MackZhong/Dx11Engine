@@ -18,46 +18,41 @@
     <ClInclude Include="Resource.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="StepTimer.h">
+    <ClInclude Include="Engine\StepTimer.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Game.h">
+    <ClInclude Include="Engine\Game.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="pch.h">
+    <ClInclude Include="Engine\EnginePCH.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="MySprites.h">
+    <ClInclude Include="SimpleRendering.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderingModel.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Game.cpp">
+    <ClCompile Include="Engine\Game.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="pch.cpp">
+    <ClCompile Include="Engine\EnginePCH.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="MySprites.cpp">
+    <ClCompile Include="SimpleRendering.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderingModel.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="resource.rc">
-      <Filter>资源文件</Filter>
-    </ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="directx.ico">
-      <Filter>资源文件</Filter>
-    </Image>
-    <Image Include="preview.png">
-      <Filter>资源文件</Filter>
-    </Image>
-    <Image Include="cat.png">
+    <Image Include="Engine\directx.ico">
       <Filter>资源文件</Filter>
     </Image>
   </ItemGroup>

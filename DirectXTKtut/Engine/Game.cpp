@@ -2,13 +2,262 @@
 // Game.cpp
 //
 
-#include "pch.h"
+#include "EnginePCH.h"
 #include "Game.h"
 
 extern void ExitGame();
 
 using namespace DirectX;
-using namespace DirectX::SimpleMath;
+
+// Windows procedure
+LRESULT CALLBACK GameWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	PAINTSTRUCT ps;
+	HDC hdc;
+
+	static bool s_in_sizemove = false;
+	static bool s_in_suspend = false;
+	static bool s_minimized = false;
+	static bool s_fullscreen = false;
+	// TODO: Set s_fullscreen to true if defaulting to fullscreen.
+
+	auto pGame = reinterpret_cast<Game*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+	switch (message)
+	{
+	case WM_PAINT:
+		if (s_in_sizemove && pGame)
+		{
+			pGame->Tick();
+		}
+		else
+		{
+			hdc = BeginPaint(hWnd, &ps);
+			EndPaint(hWnd, &ps);
+		}
+		break;
+
+	case WM_SIZE:
+		if (wParam == SIZE_MINIMIZED)
+		{
+			if (!s_minimized)
+			{
+				s_minimized = true;
+				if (!s_in_suspend && pGame)
+					pGame->OnSuspending();
+				s_in_suspend = true;
+			}
+		}
+		else if (s_minimized)
+		{
+			s_minimized = false;
+			if (s_in_suspend && pGame)
+				pGame->Resuming();
+			s_in_suspend = false;
+		}
+		else if (!s_in_sizemove && pGame)
+		{
+			pGame->ChangeWindowSize(LOWORD(lParam), HIWORD(lParam));
+		}
+		break;
+
+	case WM_ENTERSIZEMOVE:
+		s_in_sizemove = true;
+		break;
+
+	case WM_EXITSIZEMOVE:
+		s_in_sizemove = false;
+		if (pGame)
+		{
+			RECT rc;
+			GetClientRect(hWnd, &rc);
+
+			pGame->ChangeWindowSize(rc.right - rc.left, rc.bottom - rc.top);
+		}
+		break;
+
+	case WM_GETMINMAXINFO:
+	{
+		auto info = reinterpret_cast<MINMAXINFO*>(lParam);
+		info->ptMinTrackSize.x = 320;
+		info->ptMinTrackSize.y = 200;
+	}
+	break;
+
+	case WM_ACTIVATEAPP:
+		if (pGame)
+		{
+			if (wParam)
+			{
+				pGame->OnActivated();
+			}
+			else
+			{
+				pGame->OnDeactivated();
+			}
+		}
+		break;
+
+	case WM_POWERBROADCAST:
+		switch (wParam)
+		{
+		case PBT_APMQUERYSUSPEND:
+			if (!s_in_suspend && pGame)
+				pGame->OnSuspending();
+			s_in_suspend = true;
+			return TRUE;
+
+		case PBT_APMRESUMESUSPEND:
+			if (!s_minimized)
+			{
+				if (s_in_suspend && pGame)
+					pGame->Resuming();
+				s_in_suspend = false;
+			}
+			return TRUE;
+		}
+		break;
+
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
+
+	case WM_KEYDOWN:
+		if (VK_ESCAPE == wParam)
+			DestroyWindow(hWnd);
+		break;
+
+	case WM_SYSKEYDOWN:
+		if (wParam == VK_RETURN && (lParam & 0x60000000) == 0x20000000)
+		{
+			// Implements the classic ALT+ENTER fullscreen toggle
+			if (s_fullscreen)
+			{
+				SetWindowLongPtr(hWnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+				SetWindowLongPtr(hWnd, GWL_EXSTYLE, 0);
+
+				int width = 800;
+				int height = 600;
+				if (pGame)
+					pGame->GetDefaultSize(width, height);
+
+				ShowWindow(hWnd, SW_SHOWNORMAL);
+
+				SetWindowPos(hWnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+			}
+			else
+			{
+				SetWindowLongPtr(hWnd, GWL_STYLE, 0);
+				SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_TOPMOST);
+
+				SetWindowPos(hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+
+				ShowWindow(hWnd, SW_SHOWMAXIMIZED);
+			}
+
+			s_fullscreen = !s_fullscreen;
+		}
+		break;
+
+	case WM_MENUCHAR:
+		// A menu is active and the user presses a key that does not correspond
+		// to any mnemonic or accelerator key. Ignore so we don't produce an error beep.
+		return MAKELRESULT(0, MNC_CLOSE);
+	}
+
+	return DefWindowProc(hWnd, message, wParam, lParam);
+}
+
+int Game::Run(HINSTANCE hInstance) {
+	if (!XMVerifyCPUSupport())
+		return 1;
+
+	HRESULT hr = CoInitializeEx(nullptr, COINITBASE_MULTITHREADED);
+	if (FAILED(hr))
+		return 2;
+
+	auto path = std::make_unique<wchar_t[]>(MAX_PATH);
+	GetCurrentDirectoryW(MAX_PATH, path.get());
+	wchar_t iconFile[] = L"directx.ico";
+	wchar_t enginePath[] = L"Engine\\";
+	if (PathFileExists(iconFile))
+	{
+		PathCombineW(path.get(), path.get(), iconFile);
+	}
+	else if (PathFileExists(enginePath)) {
+		PathCombineW(path.get(), path.get(), enginePath);
+		if (PathFileExistsW(path.get())) {
+			PathCombineW(path.get(), path.get(), iconFile);
+		}
+	}
+	// Register class and create window
+	{
+		// Register class
+		WNDCLASSEX wcex;
+		wcex.cbSize = sizeof(WNDCLASSEX);
+		wcex.style = CS_HREDRAW | CS_VREDRAW;
+		wcex.lpfnWndProc = GameWindowProc;
+		wcex.cbClsExtra = 0;
+		wcex.cbWndExtra = 0;
+		wcex.hInstance = hInstance;
+		wcex.hIcon = (HICON)LoadImageW(NULL, path.get(), IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
+		wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+		wcex.lpszMenuName = nullptr;
+		wcex.lpszClassName = this->GetClass();
+		wcex.hIconSm = wcex.hIcon;
+		if (!RegisterClassEx(&wcex))
+			return 1;
+
+		// Create window
+		RECT rc;
+		rc.top = 0;
+		rc.left = 0;
+		rc.right = static_cast<LONG>(m_outputWidth);
+		rc.bottom = static_cast<LONG>(m_outputHeight);
+
+		AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+
+		HWND hwnd = CreateWindowEx(0, this->GetClass(), this->GetTitle(), WS_OVERLAPPEDWINDOW,
+			CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, hInstance,
+			nullptr);
+		// TODO: Change to CreateWindowEx(WS_EX_TOPMOST, L"Dx11Tut01WindowClass", L"Dx11Tut01-Sprites", WS_POPUP,
+		// to default to fullscreen.
+
+		if (!hwnd)
+			return 1;
+
+		ShowWindow(hwnd, SW_SHOW);
+		// TODO: Change nCmdShow to SW_SHOWMAXIMIZED to default to fullscreen.
+
+		SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+
+		GetClientRect(hwnd, &rc);
+
+		this->Initialize(hwnd, rc.right - rc.left, rc.bottom - rc.top);
+	}
+
+	// Main message loop
+	MSG msg = {};
+	while (WM_QUIT != msg.message)
+	{
+		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+		else
+		{
+			this->Tick();
+		}
+	}
+
+	//g_game.reset();
+
+	CoUninitialize();
+
+	return (int)msg.wParam;
+}
 
 Game::Game() :
 	m_window(nullptr),
@@ -42,19 +291,10 @@ void Game::Tick()
 {
 	m_timer.Tick([&]()
 	{
-		Update(m_timer);
+		OnUpdate(m_timer);
 	});
 
 	Render();
-}
-
-// Updates the world.
-void Game::Update(DX::StepTimer const& timer)
-{
-	float elapsedTime = float(timer.GetElapsedSeconds());
-
-	// TODO: Add your game logic here.
-	elapsedTime;
 }
 
 // Draws the scene.
@@ -69,6 +309,7 @@ void Game::Render()
 	Clear();
 
 	// TODO: Add your rendering code here.
+	OnRender();
 
 	Present();
 }
@@ -106,27 +347,12 @@ void Game::Present()
 	}
 }
 
-// Message handlers
-void Game::OnActivated()
-{
-	// TODO: Game is becoming active window.
-}
-
-void Game::OnDeactivated()
-{
-	// TODO: Game is becoming background window.
-}
-
-void Game::OnSuspending()
-{
-	// TODO: Game is being power-suspended (or minimized).
-}
-
 void Game::Resuming()
 {
 	m_timer.ResetElapsedTime();
 
 	// TODO: Game is being power-resumed (or returning from minimize).
+	OnResuming();
 }
 
 void Game::ChangeWindowSize(int width, int height)
@@ -137,14 +363,7 @@ void Game::ChangeWindowSize(int width, int height)
 	CreateResources();
 
 	// TODO: Game window is being resized.
-}
-
-// Properties
-void Game::GetDefaultSize(int& width, int& height) const
-{
-	// TODO: Change to desired default window size (note minimum size is 320x200).
-	width = 800;
-	height = 600;
+	OnWindowSizeChanged(width, height);
 }
 
 // These are the resources that depend on the device.
@@ -212,6 +431,7 @@ void Game::CreateDevice()
 	DX::ThrowIfFailed(context.As(&m_d3dContext));
 
 	// TODO: Initialize device dependent objects here (independent of window size).
+	CreateDeviceDependentResource();
 }
 
 // Allocate all memory resources that change on a window SizeChanged event.
@@ -308,11 +528,13 @@ void Game::CreateResources()
 	DX::ThrowIfFailed(m_d3dDevice->CreateDepthStencilView(depthStencil.Get(), &depthStencilViewDesc, m_depthStencilView.ReleaseAndGetAddressOf()));
 
 	// TODO: Initialize windows-size dependent objects here.
+	CreateWindowDependentResource(backBufferWidth, backBufferHeight);
 }
 
 void Game::DeviceLost()
 {
 	// TODO: Add Direct3D resource cleanup here.
+	OnDeviceLost();
 
 	m_depthStencilView.Reset();
 	m_renderTargetView.Reset();
@@ -323,4 +545,10 @@ void Game::DeviceLost()
 	CreateDevice();
 
 	CreateResources();
+}
+
+// Exit helper
+void ExitGame()
+{
+	PostQuitMessage(0);
 }

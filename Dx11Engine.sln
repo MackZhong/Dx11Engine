@@ -11,7 +11,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dx11TutStart", "Dx11TutStar
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTK_Desktop_2017", "..\DirectXTK11\DirectXTK_Desktop_2017.vcxproj", "{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dx11Tut01Sprites", "Dx11Tut01-Sprites\Dx11Tut01-Sprites.vcxproj", "{DBB4A77E-BA59-4990-B32E-B564FBC11673}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dx11Tut01-Sprites", "Dx11Tut01-Sprites\Dx11Tut01-Sprites.vcxproj", "{DBB4A77E-BA59-4990-B32E-B564FBC11673}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTKtut", "DirectXTKtut\DirectXTKtut.vcxproj", "{5A8243C6-E31F-4D48-8715-2AC5D4014B2B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E} = {E0B52AE7-E160-4D32-BF3F-910B785E5A8E}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -61,6 +66,14 @@ Global
 		{DBB4A77E-BA59-4990-B32E-B564FBC11673}.Release|Win32.Build.0 = Release|Win32
 		{DBB4A77E-BA59-4990-B32E-B564FBC11673}.Release|x64.ActiveCfg = Release|x64
 		{DBB4A77E-BA59-4990-B32E-B564FBC11673}.Release|x64.Build.0 = Release|x64
+		{5A8243C6-E31F-4D48-8715-2AC5D4014B2B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{5A8243C6-E31F-4D48-8715-2AC5D4014B2B}.Debug|Win32.Build.0 = Debug|Win32
+		{5A8243C6-E31F-4D48-8715-2AC5D4014B2B}.Debug|x64.ActiveCfg = Debug|x64
+		{5A8243C6-E31F-4D48-8715-2AC5D4014B2B}.Debug|x64.Build.0 = Debug|x64
+		{5A8243C6-E31F-4D48-8715-2AC5D4014B2B}.Release|Win32.ActiveCfg = Release|Win32
+		{5A8243C6-E31F-4D48-8715-2AC5D4014B2B}.Release|Win32.Build.0 = Release|Win32
+		{5A8243C6-E31F-4D48-8715-2AC5D4014B2B}.Release|x64.ActiveCfg = Release|x64
+		{5A8243C6-E31F-4D48-8715-2AC5D4014B2B}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

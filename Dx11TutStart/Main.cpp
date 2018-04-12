@@ -151,12 +151,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			s_minimized = false;
 			if (s_in_suspend && game)
-				game->OnResuming();
+				game->Resuming();
 			s_in_suspend = false;
 		}
 		else if (!s_in_sizemove && game)
 		{
-			game->OnWindowSizeChanged(LOWORD(lParam), HIWORD(lParam));
+			game->ChangeWindowSize(LOWORD(lParam), HIWORD(lParam));
 		}
 		break;
 
@@ -171,7 +171,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			RECT rc;
 			GetClientRect(hWnd, &rc);
 
-			game->OnWindowSizeChanged(rc.right - rc.left, rc.bottom - rc.top);
+			game->ChangeWindowSize(rc.right - rc.left, rc.bottom - rc.top);
 		}
 		break;
 
@@ -210,7 +210,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			if (!s_minimized)
 			{
 				if (s_in_suspend && game)
-					game->OnResuming();
+					game->Resuming();
 				s_in_suspend = false;
 			}
 			return TRUE;

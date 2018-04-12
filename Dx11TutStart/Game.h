@@ -26,8 +26,8 @@ public:
 	void OnActivated();
 	void OnDeactivated();
 	void OnSuspending();
-	void OnResuming();
-	void OnWindowSizeChanged(int width, int height);
+	void Resuming();
+	void ChangeWindowSize(int width, int height);
 
 	// Properties
 	void GetDefaultSize(int& width, int& height) const;
@@ -43,7 +43,7 @@ private:
 	void CreateDevice();
 	void CreateResources();
 
-	void OnDeviceLost();
+	void DeviceLost();
 
 	// Device resources.
 	HWND                                            m_window;

@@ -8,7 +8,242 @@
 extern void ExitGame();
 
 using namespace DirectX;
-using namespace DirectX::SimpleMath;
+
+// Windows procedure
+LRESULT CALLBACK GameWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	PAINTSTRUCT ps;
+	HDC hdc;
+
+	static bool s_in_sizemove = false;
+	static bool s_in_suspend = false;
+	static bool s_minimized = false;
+	static bool s_fullscreen = false;
+	// TODO: Set s_fullscreen to true if defaulting to fullscreen.
+
+	auto pGame = reinterpret_cast<Game*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+	switch (message)
+	{
+	case WM_PAINT:
+		if (s_in_sizemove && pGame)
+		{
+			pGame->Tick();
+		}
+		else
+		{
+			hdc = BeginPaint(hWnd, &ps);
+			EndPaint(hWnd, &ps);
+		}
+		break;
+
+	case WM_SIZE:
+		if (wParam == SIZE_MINIMIZED)
+		{
+			if (!s_minimized)
+			{
+				s_minimized = true;
+				if (!s_in_suspend && pGame)
+					pGame->OnSuspending();
+				s_in_suspend = true;
+			}
+		}
+		else if (s_minimized)
+		{
+			s_minimized = false;
+			if (s_in_suspend && pGame)
+				pGame->Resuming();
+			s_in_suspend = false;
+		}
+		else if (!s_in_sizemove && pGame)
+		{
+			pGame->ChangeWindowSize(LOWORD(lParam), HIWORD(lParam));
+		}
+		break;
+
+	case WM_ENTERSIZEMOVE:
+		s_in_sizemove = true;
+		break;
+
+	case WM_EXITSIZEMOVE:
+		s_in_sizemove = false;
+		if (pGame)
+		{
+			RECT rc;
+			GetClientRect(hWnd, &rc);
+
+			pGame->ChangeWindowSize(rc.right - rc.left, rc.bottom - rc.top);
+		}
+		break;
+
+	case WM_GETMINMAXINFO:
+	{
+		auto info = reinterpret_cast<MINMAXINFO*>(lParam);
+		info->ptMinTrackSize.x = 320;
+		info->ptMinTrackSize.y = 200;
+	}
+	break;
+
+	case WM_ACTIVATEAPP:
+		if (pGame)
+		{
+			if (wParam)
+			{
+				pGame->OnActivated();
+			}
+			else
+			{
+				pGame->OnDeactivated();
+			}
+		}
+		break;
+
+	case WM_POWERBROADCAST:
+		switch (wParam)
+		{
+		case PBT_APMQUERYSUSPEND:
+			if (!s_in_suspend && pGame)
+				pGame->OnSuspending();
+			s_in_suspend = true;
+			return TRUE;
+
+		case PBT_APMRESUMESUSPEND:
+			if (!s_minimized)
+			{
+				if (s_in_suspend && pGame)
+					pGame->Resuming();
+				s_in_suspend = false;
+			}
+			return TRUE;
+		}
+		break;
+
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
+
+	case WM_KEYDOWN:
+		if (VK_ESCAPE == wParam)
+			DestroyWindow(hWnd);
+		break;
+
+	case WM_SYSKEYDOWN:
+		if (wParam == VK_RETURN && (lParam & 0x60000000) == 0x20000000)
+		{
+			// Implements the classic ALT+ENTER fullscreen toggle
+			if (s_fullscreen)
+			{
+				SetWindowLongPtr(hWnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+				SetWindowLongPtr(hWnd, GWL_EXSTYLE, 0);
+
+				int width = 800;
+				int height = 600;
+				if (pGame)
+					pGame->GetDefaultSize(width, height);
+
+				ShowWindow(hWnd, SW_SHOWNORMAL);
+
+				SetWindowPos(hWnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+			}
+			else
+			{
+				SetWindowLongPtr(hWnd, GWL_STYLE, 0);
+				SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_TOPMOST);
+
+				SetWindowPos(hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+
+				ShowWindow(hWnd, SW_SHOWMAXIMIZED);
+			}
+
+			s_fullscreen = !s_fullscreen;
+		}
+		break;
+
+	case WM_MENUCHAR:
+		// A menu is active and the user presses a key that does not correspond
+		// to any mnemonic or accelerator key. Ignore so we don't produce an error beep.
+		return MAKELRESULT(0, MNC_CLOSE);
+	}
+
+	return DefWindowProc(hWnd, message, wParam, lParam);
+}
+
+int Game::Run(HINSTANCE hInstance) {
+	if (!XMVerifyCPUSupport())
+		return 1;
+
+	HRESULT hr = CoInitializeEx(nullptr, COINITBASE_MULTITHREADED);
+	if (FAILED(hr))
+		return 2;
+
+	// Register class and create window
+	{
+		// Register class
+		WNDCLASSEX wcex;
+		wcex.cbSize = sizeof(WNDCLASSEX);
+		wcex.style = CS_HREDRAW | CS_VREDRAW;
+		wcex.lpfnWndProc = GameWindowProc;
+		wcex.cbClsExtra = 0;
+		wcex.cbWndExtra = 0;
+		wcex.hInstance = hInstance;
+		wcex.hIcon = LoadIcon(hInstance, L"IDI_ICON");
+		wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+		wcex.lpszMenuName = nullptr;
+		wcex.lpszClassName = this->GetClass();
+		wcex.hIconSm = LoadIcon(wcex.hInstance, L"IDI_ICON");
+		if (!RegisterClassEx(&wcex))
+			return 1;
+
+		// Create window
+		RECT rc;
+		rc.top = 0;
+		rc.left = 0;
+		rc.right = static_cast<LONG>(m_outputWidth);
+		rc.bottom = static_cast<LONG>(m_outputHeight);
+
+		AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+
+		HWND hwnd = CreateWindowEx(0, this->GetClass(), this->GetTitle(), WS_OVERLAPPEDWINDOW,
+			CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, hInstance,
+			nullptr);
+		// TODO: Change to CreateWindowEx(WS_EX_TOPMOST, L"Dx11Tut01WindowClass", L"Dx11Tut01-Sprites", WS_POPUP,
+		// to default to fullscreen.
+
+		if (!hwnd)
+			return 1;
+
+		ShowWindow(hwnd, SW_SHOW);
+		// TODO: Change nCmdShow to SW_SHOWMAXIMIZED to default to fullscreen.
+
+		SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+
+		GetClientRect(hwnd, &rc);
+
+		this->Initialize(hwnd, rc.right - rc.left, rc.bottom - rc.top);
+	}
+
+	// Main message loop
+	MSG msg = {};
+	while (WM_QUIT != msg.message)
+	{
+		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+		else
+		{
+			this->Tick();
+		}
+	}
+
+	//g_game.reset();
+
+	CoUninitialize();
+
+	return (int)msg.wParam;
+}
 
 Game::Game() :
 	m_window(nullptr),
@@ -55,6 +290,8 @@ void Game::Update(DX::StepTimer const& timer)
 
 	// TODO: Add your game logic here.
 	elapsedTime;
+
+	OnUpdate(elapsedTime);
 }
 
 // Draws the scene.
@@ -69,12 +306,7 @@ void Game::Render()
 	Clear();
 
 	// TODO: Add your rendering code here.
-	m_spriteBatch->Begin();
-
-	m_spriteBatch->Draw(m_texture.Get(), m_screenPos, nullptr, Colors::White,
-		0.f, m_origin);
-
-	m_spriteBatch->End();
+	OnRender();
 
 	Present();
 }
@@ -104,7 +336,7 @@ void Game::Present()
 	// If the device was reset we must completely reinitialize the renderer.
 	if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
 	{
-		OnDeviceLost();
+		DeviceLost();
 	}
 	else
 	{
@@ -112,30 +344,15 @@ void Game::Present()
 	}
 }
 
-// Message handlers
-void Game::OnActivated()
-{
-	// TODO: Game is becoming active window.
-}
-
-void Game::OnDeactivated()
-{
-	// TODO: Game is becoming background window.
-}
-
-void Game::OnSuspending()
-{
-	// TODO: Game is being power-suspended (or minimized).
-}
-
-void Game::OnResuming()
+void Game::Resuming()
 {
 	m_timer.ResetElapsedTime();
 
 	// TODO: Game is being power-resumed (or returning from minimize).
+	OnResuming();
 }
 
-void Game::OnWindowSizeChanged(int width, int height)
+void Game::ChangeWindowSize(int width, int height)
 {
 	m_outputWidth = std::max(width, 1);
 	m_outputHeight = std::max(height, 1);
@@ -143,14 +360,7 @@ void Game::OnWindowSizeChanged(int width, int height)
 	CreateResources();
 
 	// TODO: Game window is being resized.
-}
-
-// Properties
-void Game::GetDefaultSize(int& width, int& height) const
-{
-	// TODO: Change to desired default window size (note minimum size is 320x200).
-	width = 800;
-	height = 600;
+	OnWindowSizeChanged(width, height);
 }
 
 // These are the resources that depend on the device.
@@ -218,28 +428,7 @@ void Game::CreateDevice()
 	DX::ThrowIfFailed(context.As(&m_d3dContext));
 
 	// TODO: Initialize device dependent objects here (independent of window size).
-	m_spriteBatch = std::make_unique<SpriteBatch>(m_d3dContext.Get());
-
-	auto pathBuf = std::make_unique<wchar_t[]>(MAX_PATH);
-	GetCurrentDirectoryW(MAX_PATH, pathBuf.get());
-	//MessageBoxW(NULL, pathBuf.get(), L"CurrentDirectory", MB_OK);
-	OutputDebugStringW(pathBuf.get());
-	OutputDebugStringW(L"\n");
-
-	ComPtr<ID3D11Resource> resource;
-	DX::ThrowIfFailed(
-		CreateWICTextureFromFile(m_d3dDevice.Get(), L"cat.png",
-			resource.GetAddressOf(),
-			m_texture.ReleaseAndGetAddressOf()));
-
-	ComPtr<ID3D11Texture2D> cat;
-	DX::ThrowIfFailed(resource.As(&cat));
-
-	CD3D11_TEXTURE2D_DESC catDesc;
-	cat->GetDesc(&catDesc);
-
-	m_origin.x = float(catDesc.Width / 2);
-	m_origin.y = float(catDesc.Height / 2);
+	CreateDeviceDependentResource();
 }
 
 // Allocate all memory resources that change on a window SizeChanged event.
@@ -266,7 +455,7 @@ void Game::CreateResources()
 		if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
 		{
 			// If the device was removed for any reason, a new device and swap chain will need to be created.
-			OnDeviceLost();
+			DeviceLost();
 
 			// Everything is set up now. Do not continue execution of this method. OnDeviceLost will reenter this method 
 			// and correctly set up the new device.
@@ -336,15 +525,13 @@ void Game::CreateResources()
 	DX::ThrowIfFailed(m_d3dDevice->CreateDepthStencilView(depthStencil.Get(), &depthStencilViewDesc, m_depthStencilView.ReleaseAndGetAddressOf()));
 
 	// TODO: Initialize windows-size dependent objects here.
-	m_screenPos.x = backBufferWidth / 2.f;
-	m_screenPos.y = backBufferHeight / 2.f;
+	CreateWindowDependentResource(backBufferWidth, backBufferHeight);
 }
 
-void Game::OnDeviceLost()
+void Game::DeviceLost()
 {
 	// TODO: Add Direct3D resource cleanup here.
-	m_texture.Reset();
-	m_spriteBatch.reset();
+	OnDeviceLost();
 
 	m_depthStencilView.Reset();
 	m_renderTargetView.Reset();
@@ -355,4 +542,10 @@ void Game::OnDeviceLost()
 	CreateDevice();
 
 	CreateResources();
+}
+
+// Exit helper
+void ExitGame()
+{
+	PostQuitMessage(0);
 }

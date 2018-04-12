@@ -32,9 +32,8 @@ protected:
 	void Initialize(HWND window, int width, int height);
 	// Basic game loop
 	void Tick();
-	void Update(DX::StepTimer const& timer);
 	// Updates the world.
-	virtual void OnUpdate(float elapsedTime) = 0;
+	virtual void OnUpdate(DX::StepTimer const& timer) = 0;
 	void Render();
 	// Draws the scene.
 	virtual void OnRender() = 0;
