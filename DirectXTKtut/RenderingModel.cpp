@@ -40,8 +40,11 @@ namespace
 
 		// TODO: dynamic config vertex buffer layout
 		g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
-			VertexPositionNormalColorTexture::InputElements,
-			VertexPositionNormalColorTexture::InputElements + VertexPositionNormalColorTexture::InputElementCount);
+			VertexPositionNormalTexture::InputElements,
+			VertexPositionNormalTexture::InputElements + VertexPositionNormalTexture::InputElementCount);
+		//g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+		//	VertexPositionNormalColorTexture::InputElements,
+		//	VertexPositionNormalColorTexture::InputElements + VertexPositionNormalColorTexture::InputElementCount);
 
 		return TRUE;
 	}
@@ -201,11 +204,11 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 			UINT32 u1 = *(PUINT16)pBuf;
 			pBuf += 2;
 			ULONG verticesBytes = numVertices * m_VertexStride;
-			auto verts;
-			if (32 == m_VertexStride)
-				verts = reinterpret_cast<const VertexPositionNormalTexture*>(pBuf);
-			else if (48 == m_VertexStride)
-				verts = reinterpret_cast<const VertexPositionNormalColorTexture*>(pBuf);
+			auto verts = reinterpret_cast<const VertexPositionNormalTexture*>(pBuf);
+			//if (32 == m_VertexStride)
+			//	verts = reinterpret_cast<const VertexPositionNormalTexture*>(pBuf);
+			//else if (48 == m_VertexStride)
+			//	verts = reinterpret_cast<const VertexPositionNormalColorTexture*>(pBuf);
 
 
 			// Create vertex buffer
