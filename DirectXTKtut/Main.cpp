@@ -3,7 +3,7 @@
 //
 
 #include "EnginePCH.h"
-#include "RenderingModel.h"
+#include "DR_ModelRendering.h"
 
 
 // Entry point
@@ -12,7 +12,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
-	RenderingModel game;
+	DR_ModelRendering game;
 
 	return game.Run(hInstance);
 }

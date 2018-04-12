@@ -159,8 +159,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="DR_ModelRendering.h" />
+    <ClInclude Include="Engine\DeviceResources.h" />
     <ClInclude Include="Engine\EnginePCH.h" />
     <ClInclude Include="Engine\Game.h" />
+    <ClInclude Include="Engine\Game_DR.h" />
     <ClInclude Include="Engine\Helper.h" />
     <ClInclude Include="Engine\StepTimer.h" />
     <ClInclude Include="RenderingModel.h" />
@@ -168,6 +171,8 @@
     <ClInclude Include="SimpleRendering.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="DR_ModelRendering.cpp" />
+    <ClCompile Include="Engine\DeviceResources.cpp" />
     <ClCompile Include="Engine\EnginePCH.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -175,6 +180,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Engine\Game.cpp" />
+    <ClCompile Include="Engine\Game_DR.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="RenderingModel.cpp" />
     <ClCompile Include="SimpleRendering.cpp" />

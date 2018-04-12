@@ -39,12 +39,82 @@ namespace
 		UNREFERENCED_PARAMETER(lpContext);
 
 		// TODO: dynamic config vertex buffer layout
-		g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
-			VertexPositionNormalTexture::InputElements,
-			VertexPositionNormalTexture::InputElements + VertexPositionNormalTexture::InputElementCount);
-		//g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
-		//	VertexPositionNormalColorTexture::InputElements,
-		//	VertexPositionNormalColorTexture::InputElements + VertexPositionNormalColorTexture::InputElementCount);
+		UINT16 stride = *(PUINT16)Parameter;
+		UINT32 vertexSize = 0;
+		switch (stride) {
+		case 12:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPosition::InputElements,
+				VertexPosition::InputElements + VertexPosition::InputElementCount);
+			vertexSize = sizeof(VertexPosition);
+			break;
+		case 20:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPositionTexture::InputElements,
+				VertexPositionTexture::InputElements + VertexPositionTexture::InputElementCount);
+			vertexSize = sizeof(VertexPositionTexture);
+			break;
+		case 24:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPositionNormal::InputElements,
+				VertexPositionNormal::InputElements + VertexPositionNormal::InputElementCount);
+			vertexSize = sizeof(VertexPositionNormal);
+			break;
+		case 28:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPositionColor::InputElements,
+				VertexPositionColor::InputElements + VertexPositionColor::InputElementCount);
+			vertexSize = sizeof(VertexPositionColor);
+			break;
+			//case 28:
+			//	g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+			//		VertexPositionDualTexture::InputElements,
+			//		VertexPositionDualTexture::InputElements + VertexPositionDualTexture::InputElementCount);
+			//vertexSize = sizeof(VertexPositionDualTexture);
+			//	break;
+		case 32:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPositionNormalTexture::InputElements,
+				VertexPositionNormalTexture::InputElements + VertexPositionNormalTexture::InputElementCount);
+			vertexSize = sizeof(VertexPositionNormalTexture);
+			break;
+		case 36:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPositionColorTexture::InputElements,
+				VertexPositionColorTexture::InputElements + VertexPositionColorTexture::InputElementCount);
+			vertexSize = sizeof(VertexPositionColorTexture);
+			break;
+		case 40:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPositionNormalColor::InputElements,
+				VertexPositionNormalColor::InputElements + VertexPositionNormalColor::InputElementCount);
+			vertexSize = sizeof(VertexPositionNormalColor);
+			break;
+		case 48:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPositionNormalColorTexture::InputElements,
+				VertexPositionNormalColorTexture::InputElements + VertexPositionNormalColorTexture::InputElementCount);
+			vertexSize = sizeof(VertexPositionNormalColorTexture);
+			break;
+		case 52:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPositionNormalTangentColorTexture::InputElements,
+				VertexPositionNormalTangentColorTexture::InputElements + VertexPositionNormalTangentColorTexture::InputElementCount);
+			vertexSize = sizeof(VertexPositionNormalTangentColorTexture);
+			break;
+		case 60:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPositionNormalTangentColorTextureSkinning::InputElements,
+				VertexPositionNormalTangentColorTextureSkinning::InputElements + VertexPositionNormalTangentColorTextureSkinning::InputElementCount);
+			vertexSize = sizeof(VertexPositionNormalTangentColorTextureSkinning);
+			break;
+		default:
+			return FALSE;
+		}
+
+		if (lpContext) {
+			memcpy(*lpContext, &vertexSize, sizeof(UINT32));
+		}
 
 		return TRUE;
 	}
@@ -55,9 +125,6 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 	std::shared_ptr<IEffect> ieffect, bool ccw, bool pmalpha)
 {
 	const uint8_t* pBufBase = pBuf;
-
-	if (!InitOnceExecuteOnce(&g_InitOnce, InitializeDecl, nullptr, nullptr))
-		throw std::exception("One-time initialization failed");
 
 	if (!d3dDevice || !pBuf)
 		throw std::exception("Device and meshData cannot be null");
@@ -80,6 +147,7 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 	std::string m_MaterialName;
 
 	UINT32 numVertices = 0;
+	UINT16 vertexStride = 0;
 	UINT32 numIndices = 0;
 	ComPtr<ID3D11Buffer> vb;
 	ComPtr<ID3D11Buffer> ib;
@@ -197,19 +265,17 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 			//                 print("Vertex info ends at:",hex(f.tell()))
 			numVertices = *(PUINT32)pBuf;
 			pBuf += 4;
-			UINT16 m_VertexStride = *(PUINT16)pBuf;
-			//assert(sizeof(VertexPositionNormalColorTexture) == m_VertexStride);
+			vertexStride = *(PUINT16)pBuf;
 			pBuf += 2;
 
 			UINT32 u1 = *(PUINT16)pBuf;
 			pBuf += 2;
-			ULONG verticesBytes = numVertices * m_VertexStride;
-			auto verts = reinterpret_cast<const VertexPositionNormalTexture*>(pBuf);
-			//if (32 == m_VertexStride)
-			//	verts = reinterpret_cast<const VertexPositionNormalTexture*>(pBuf);
-			//else if (48 == m_VertexStride)
-			//	verts = reinterpret_cast<const VertexPositionNormalColorTexture*>(pBuf);
+			ULONG verticesBytes = numVertices * vertexStride;
 
+			PUINT32 pVertSize = new UINT32;
+			if (!InitOnceExecuteOnce(&g_InitOnce, InitializeDecl, &vertexStride, (LPVOID*)&pVertSize))
+				throw std::exception("Vertex InputElement Layout initialization failed");
+			assert(*pVertSize == vertexStride);
 
 			// Create vertex buffer
 			{
@@ -287,8 +353,8 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 		ieffect->GetVertexShaderBytecode(&shaderByteCode, &byteCodeLength);
 
 		DX::ThrowIfFailed(
-			d3dDevice->CreateInputLayout(VertexPositionNormalColorTexture::InputElements,
-				VertexPositionNormalColorTexture::InputElementCount,
+			d3dDevice->CreateInputLayout(g_vbdecl->data(),
+			(UINT)g_vbdecl->size(),
 				shaderByteCode, byteCodeLength,
 				il.GetAddressOf()));
 
@@ -298,7 +364,7 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 	auto part = new ModelMeshPart();
 	part->indexCount = numIndices;
 	part->startIndex = 0;
-	part->vertexStride = static_cast<UINT>(sizeof(VertexPositionNormalColorTexture));
+	part->vertexStride = vertexStride;
 	part->inputLayout = il;
 	part->indexBuffer = ib;
 	part->vertexBuffer = vb;
@@ -312,8 +378,7 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 		XMVectorSet(position1.x, position1.y, position1.z, 1.0f),
 		XMVectorSet(position2.x, position2.y, position2.z, 1.0f));
 	BoundingSphere::CreateFromBoundingBox(mesh->boundingSphere, mesh->boundingBox);
-	//BoundingSphere::CreateFromPoints(mesh->boundingSphere, numVertices, &position1, sizeof(VertexPositionNormalColorTexture));
-	//BoundingBox::CreateFromPoints(mesh->boundingBox, numVertices, &position1, sizeof(VertexPositionNormalColorTexture));
+
 	mesh->meshParts.emplace_back(part);
 
 	std::unique_ptr<Model> model(new Model());
@@ -552,15 +617,10 @@ void RenderingModel::CreateDeviceDependentResource()
 	//m_fxFactory = std::make_unique<EffectFactory>(m_d3dDevice.Get());
 	m_fxFactory = std::make_unique<DGSLEffectFactory>(m_d3dDevice.Get());
 
-	m_model = LoadEntityFromPak(m_d3dDevice.Get(), L"E:/Games/Men of War Assault Squad/resource/entity/e2.pak",
+	m_model = LoadEntityFromPak(m_d3dDevice.Get(), L"E:/Games/MenofWarAssaultSquad2Origins/resource/entity/e2.pak",
 		"-vehicle/cannon/88mm_u_boat/turret.ply");
 	//"-vehicle/airborne/a6m_m21_86/cockpit.ply");
 
-//auto path = std::make_unique<wchar_t[]>(MAX_PATH);
-//GetCurrentDirectoryW(MAX_PATH, path.get());
-//SetCurrentDirectoryW(L"assets");
-//m_model = Model::CreateFromCMO(m_d3dDevice.Get(), L"cup.cmo", *m_fxFactory);
-//SetCurrentDirectoryW(path.get());
 
 //m_model->UpdateEffects([](IEffect* effect) {
 //	auto lights = dynamic_cast<IEffectLights*>(effect);

@@ -35,10 +35,18 @@ using Microsoft::WRL::ComPtr;
 
 #include <d3d11_4.h>
 #pragma comment(lib, "d3d11.lib")
-#include <dxgi1_2.h>
+#if defined(NTDDI_WIN10_RS2)
+#include <dxgi1_6.h>
+#else
+#include <dxgi1_5.h>
+#endif
+#pragma comment(lib, "dxgi.lib")
 #include <DirectXMath.h>
 #include <DirectXColors.h>
 using namespace DirectX;
+#ifdef _DEBUG
+#include <dxgidebug.h>
+#endif
 
 #include <algorithm>
 #include <exception>
@@ -49,12 +57,29 @@ using namespace DirectX;
 
 namespace DX
 {
+	// Helper class for COM exceptions
+	class com_exception : public std::exception
+	{
+	public:
+		com_exception(HRESULT hr) : result(hr) {}
+
+		virtual const char* what() const override
+		{
+			static char s_str[64] = {};
+			sprintf_s(s_str, "Failure with HRESULT of %08X", static_cast<unsigned int>(result));
+			return s_str;
+		}
+
+	private:
+		HRESULT result;
+	};
+
+	// Helper utility converts D3D API failures into exceptions.
 	inline void ThrowIfFailed(HRESULT hr)
 	{
 		if (FAILED(hr))
 		{
-			// Set a breakpoint on this line to catch DirectX API errors
-			throw std::exception();
+			throw com_exception(hr);
 		}
 	}
 }

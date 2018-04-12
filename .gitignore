@@ -2,7 +2,29 @@
 # 此 .gitignore 文件已由 Microsoft(R) Visual Studio 自动创建。
 ################################################################################
 
-/.vs/Dx11Engine/v15
+
+/.git
+/.vs
+/Debug
+/Release
+/x64
 /Engine/Debug
+/Engine/Release
 /Engine/x64/Debug
+/Engine/x64/Release
+/DirectXTKtut/Debug
+/DirectXTKtut/Release
 /DirectXTKtut/x64/Debug
+/DirectXTKtut/x64/Release
+/Dx11Tut01-Sprites/Debug
+/Dx11Tut01-Sprites/Release
+/Dx11Tut01-Sprites/x64/Debug
+/Dx11Tut01-Sprites/x64/Release
+/Dx11TutStart/Debug
+/Dx11TutStart/Release
+/Dx11TutStart/x64/Debug
+/Dx11TutStart/x64/Release
+/MowModelViewer/Release
+/MowModelViewer/Debug
+/MowModelViewer/x64/Debug
+/MowModelViewer/x64/Release

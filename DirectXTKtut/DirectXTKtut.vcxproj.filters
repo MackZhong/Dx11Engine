@@ -36,6 +36,15 @@
     <ClInclude Include="Engine\Helper.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\DeviceResources.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Game_DR.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="DR_ModelRendering.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine\Game.cpp">
@@ -51,6 +60,15 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="RenderingModel.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\DeviceResources.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Game_DR.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="DR_ModelRendering.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
