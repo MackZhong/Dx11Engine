@@ -44,6 +44,8 @@ using namespace DirectX;
 #include <exception>
 #include <memory>
 #include <stdexcept>
+#include <map>
+#include <list>
 
 namespace DX
 {

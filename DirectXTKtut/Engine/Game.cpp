@@ -9,6 +9,10 @@ extern void ExitGame();
 
 using namespace DirectX;
 
+static const XMVECTORF32 START_POSITION = { 0.f, -1.5f, 0.f, 0.f };
+static const float ROTATION_GAIN = 0.004f;
+static const float MOVEMENT_GAIN = 0.07f;
+
 // Windows procedure
 LRESULT CALLBACK GameWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -25,6 +29,26 @@ LRESULT CALLBACK GameWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 
 	switch (message)
 	{
+	case WM_INPUT:
+	case WM_MOUSEMOVE:
+	case WM_LBUTTONDOWN:
+	case WM_LBUTTONUP:
+	case WM_RBUTTONDOWN:
+	case WM_RBUTTONUP:
+	case WM_MBUTTONDOWN:
+	case WM_MBUTTONUP:
+	case WM_MOUSEWHEEL:
+	case WM_XBUTTONDOWN:
+	case WM_XBUTTONUP:
+	case WM_MOUSEHOVER:
+		Mouse::ProcessMessage(message, wParam, lParam);
+		break;
+	case WM_KEYDOWN:
+	case WM_SYSKEYDOWN:
+	case WM_KEYUP:
+	case WM_SYSKEYUP:
+		Keyboard::ProcessMessage(message, wParam, lParam);
+		break;
 	case WM_PAINT:
 		if (s_in_sizemove && pGame)
 		{
@@ -96,6 +120,8 @@ LRESULT CALLBACK GameWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 				pGame->OnDeactivated();
 			}
 		}
+		Keyboard::ProcessMessage(message, wParam, lParam);
+		Mouse::ProcessMessage(message, wParam, lParam);
 		break;
 
 	case WM_POWERBROADCAST:
@@ -122,42 +148,42 @@ LRESULT CALLBACK GameWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 		PostQuitMessage(0);
 		break;
 
-	case WM_KEYDOWN:
-		if (VK_ESCAPE == wParam)
-			DestroyWindow(hWnd);
-		break;
+	//case WM_KEYDOWN:
+	//	if (VK_ESCAPE == wParam)
+	//		DestroyWindow(hWnd);
+	//	break;
 
-	case WM_SYSKEYDOWN:
-		if (wParam == VK_RETURN && (lParam & 0x60000000) == 0x20000000)
-		{
-			// Implements the classic ALT+ENTER fullscreen toggle
-			if (s_fullscreen)
-			{
-				SetWindowLongPtr(hWnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
-				SetWindowLongPtr(hWnd, GWL_EXSTYLE, 0);
+	//case WM_SYSKEYDOWN:
+	//	if (wParam == VK_RETURN && (lParam & 0x60000000) == 0x20000000)
+	//	{
+	//		// Implements the classic ALT+ENTER fullscreen toggle
+	//		if (s_fullscreen)
+	//		{
+	//			SetWindowLongPtr(hWnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+	//			SetWindowLongPtr(hWnd, GWL_EXSTYLE, 0);
 
-				int width = 800;
-				int height = 600;
-				if (pGame)
-					pGame->GetDefaultSize(width, height);
+	//			int width = 800;
+	//			int height = 600;
+	//			if (pGame)
+	//				pGame->GetDefaultSize(width, height);
 
-				ShowWindow(hWnd, SW_SHOWNORMAL);
+	//			ShowWindow(hWnd, SW_SHOWNORMAL);
 
-				SetWindowPos(hWnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
-			}
-			else
-			{
-				SetWindowLongPtr(hWnd, GWL_STYLE, 0);
-				SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_TOPMOST);
+	//			SetWindowPos(hWnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+	//		}
+	//		else
+	//		{
+	//			SetWindowLongPtr(hWnd, GWL_STYLE, 0);
+	//			SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_TOPMOST);
 
-				SetWindowPos(hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+	//			SetWindowPos(hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 
-				ShowWindow(hWnd, SW_SHOWMAXIMIZED);
-			}
+	//			ShowWindow(hWnd, SW_SHOWMAXIMIZED);
+	//		}
 
-			s_fullscreen = !s_fullscreen;
-		}
-		break;
+	//		s_fullscreen = !s_fullscreen;
+	//	}
+	//	break;
 
 	case WM_MENUCHAR:
 		// A menu is active and the user presses a key that does not correspond
@@ -263,8 +289,11 @@ Game::Game() :
 	m_window(nullptr),
 	m_outputWidth(800),
 	m_outputHeight(600),
-	m_featureLevel(D3D_FEATURE_LEVEL_9_1)
+	m_featureLevel(D3D_FEATURE_LEVEL_9_1),
+	m_pitch(0),
+	m_yaw(0)
 {
+	m_cameraPos = START_POSITION.v;
 }
 
 // Initialize the Direct3D resources required to run.
@@ -284,6 +313,9 @@ void Game::Initialize(HWND window, int width, int height)
 	m_timer.SetFixedTimeStep(true);
 	m_timer.SetTargetElapsedSeconds(1.0 / 60);
 	*/
+	m_keyboard = std::make_unique<Keyboard>();
+	m_mouse = std::make_unique<Mouse>();
+	m_mouse->SetWindow(window);
 }
 
 // Executes the basic game loop.
@@ -291,10 +323,80 @@ void Game::Tick()
 {
 	m_timer.Tick([&]()
 	{
-		OnUpdate(m_timer);
+		Update(m_timer);
 	});
 
 	Render();
+}
+
+void Game::Update(DX::StepTimer const& timer) {
+	auto kb = m_keyboard->GetState();
+	if (kb.Escape)
+		PostQuitMessage(0);
+
+	if (kb.Home)
+	{
+		m_cameraPos = START_POSITION.v;
+		m_pitch = m_yaw = 0;
+	}
+
+	Vector3 move = Vector3::Zero;
+
+	if (kb.Up || kb.W)
+		move.y += 1.f;
+
+	if (kb.Down || kb.S)
+		move.y -= 1.f;
+
+	if (kb.Left || kb.A)
+		move.x += 1.f;
+
+	if (kb.Right || kb.D)
+		move.x -= 1.f;
+
+	if (kb.PageUp || kb.Space)
+		move.z += 1.f;
+
+	if (kb.PageDown || kb.X)
+		move.z -= 1.f;
+
+	Quaternion q = Quaternion::CreateFromYawPitchRoll(m_yaw, m_pitch, 0.f);
+
+	move = Vector3::Transform(move, q);
+
+	move *= MOVEMENT_GAIN;
+
+	m_cameraPos += move;
+
+	auto mouse = m_mouse->GetState();
+	if (mouse.positionMode == Mouse::MODE_RELATIVE)
+	{
+		Vector3 delta = Vector3(float(mouse.x), float(mouse.y), 0.f)
+			* ROTATION_GAIN;
+
+		m_pitch -= delta.y;
+		m_yaw -= delta.x;
+
+		// limit pitch to straight up or straight down
+		// with a little fudge-factor to avoid gimbal lock
+		float limit = XM_PI / 2.0f - 0.01f;
+		m_pitch = std::max(-limit, m_pitch);
+		m_pitch = std::min(+limit, m_pitch);
+
+		// keep longitude in sane range by wrapping
+		if (m_yaw > XM_PI)
+		{
+			m_yaw -= XM_PI * 2.0f;
+		}
+		else if (m_yaw < -XM_PI)
+		{
+			m_yaw += XM_PI * 2.0f;
+		}
+	}
+
+	m_mouse->SetMode(mouse.leftButton ? Mouse::MODE_RELATIVE : Mouse::MODE_ABSOLUTE);
+
+	OnUpdate(timer);
 }
 
 // Draws the scene.
@@ -309,6 +411,15 @@ void Game::Render()
 	Clear();
 
 	// TODO: Add your rendering code here.
+	float y = sinf(m_pitch);
+	float r = cosf(m_pitch);
+	float z = r * cosf(m_yaw);
+	float x = r * sinf(m_yaw);
+
+	XMVECTOR lookAt = m_cameraPos + Vector3(x, y, z);
+
+	m_view = XMMatrixLookAtRH(m_cameraPos, lookAt, Vector3::Up);
+
 	OnRender();
 
 	Present();
@@ -528,6 +639,9 @@ void Game::CreateResources()
 	DX::ThrowIfFailed(m_d3dDevice->CreateDepthStencilView(depthStencil.Get(), &depthStencilViewDesc, m_depthStencilView.ReleaseAndGetAddressOf()));
 
 	// TODO: Initialize windows-size dependent objects here.
+	m_proj = Matrix::CreatePerspectiveFieldOfView(XMConvertToRadians(70.f),
+		float(backBufferWidth) / float(backBufferHeight), 0.01f, 100.f);
+
 	CreateWindowDependentResource(backBufferWidth, backBufferHeight);
 }
 

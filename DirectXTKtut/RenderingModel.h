@@ -46,8 +46,6 @@ protected:
 
 private:
 	DirectX::SimpleMath::Matrix m_world;
-	DirectX::SimpleMath::Matrix m_view;
-	DirectX::SimpleMath::Matrix m_proj;
 
 	std::unique_ptr<DirectX::CommonStates> m_states;
 	std::unique_ptr<DirectX::IEffectFactory> m_fxFactory;

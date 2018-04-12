@@ -32,6 +32,7 @@ protected:
 	void Initialize(HWND window, int width, int height);
 	// Basic game loop
 	void Tick();
+	void Update(DX::StepTimer const& timer);
 	// Updates the world.
 	virtual void OnUpdate(DX::StepTimer const& timer) = 0;
 	void Render();
@@ -85,4 +86,12 @@ protected:
 
 	// Rendering loop timer.
 	DX::StepTimer                                   m_timer;
+
+	std::unique_ptr<DirectX::Keyboard> m_keyboard;
+	std::unique_ptr<DirectX::Mouse> m_mouse;
+	DirectX::SimpleMath::Matrix m_proj;
+	DirectX::SimpleMath::Matrix m_view;
+	DirectX::SimpleMath::Vector3 m_cameraPos;
+	float m_pitch;
+	float m_yaw;
 };

@@ -161,6 +161,7 @@
   <ItemGroup>
     <ClInclude Include="Engine\EnginePCH.h" />
     <ClInclude Include="Engine\Game.h" />
+    <ClInclude Include="Engine\Helper.h" />
     <ClInclude Include="Engine\StepTimer.h" />
     <ClInclude Include="RenderingModel.h" />
     <ClInclude Include="Resource.h" />
