@@ -1,28 +1,15 @@
 #include "EnginePCH.h"
-#include "RenderingModel.h"
+#include "ModelPLY.h"
 
-//#include "BinaryReader.h"
 
-using namespace DX;
+ModelPLY::ModelPLY()
+{
+}
 
-//std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const wchar_t* szFileName,
-//	std::shared_ptr<IEffect> ieffect, bool ccw, bool pmalpha)
-//{
-//	size_t dataSize = 0;
-//	std::unique_ptr<uint8_t[]> data;
-//	HRESULT hr = BinaryReader::ReadEntireFile(szFileName, data, &dataSize);
-//	if (FAILED(hr))
-//	{
-//		DebugTrace("CreateFromPLY failed (%08X) loading '%ls'\n", hr, szFileName);
-//		throw std::exception("CreateFromVBO");
-//	}
-//
-//	auto model = CreateFromPLY(d3dDevice, data.get(), dataSize, ieffect, ccw, pmalpha);
-//
-//	model->name = szFileName;
-//
-//	return model;
-//}
+
+ModelPLY::~ModelPLY()
+{
+}
 
 namespace
 {
@@ -119,26 +106,24 @@ namespace
 	}
 }
 
-
-std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBuf, size_t dataSize,
-	std::shared_ptr<IEffect> ieffect, bool ccw, bool pmalpha)
+std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Device* d3dDevice, _In_reads_bytes_(dataSize) const uint8_t* meshData, _In_ size_t dataSize, _In_opt_ std::shared_ptr<IEffect> ieffect /*= nullptr*/, bool ccw /*= false*/, bool pmalpha /*= false*/)
 {
-	const uint8_t* pBufBase = pBuf;
+	const uint8_t* pBufBase = meshData;
 
-	if (!d3dDevice || !pBuf)
+	if (!d3dDevice || !meshData)
 		throw std::exception("Device and meshData cannot be null");
 
 	// File Header
-	if (*(PUINT64)pBuf != *(PUINT64)"EPLYBNDS") {
+	if (*(PUINT64)meshData != *(PUINT64)"EPLYBNDS") {
 		OutputDebugStringW(L"Invalid ply file.\n");
 		return nullptr;
 	}
-	pBuf += 8;
+	meshData += 8;
 
-	XMFLOAT3 position1 = *(XMFLOAT3*)pBuf;
-	pBuf += 12;
-	XMFLOAT3 position2 = *(XMFLOAT3*)pBuf;
-	pBuf += 12;
+	XMFLOAT3 position1 = *(XMFLOAT3*)meshData;
+	meshData += 12;
+	XMFLOAT3 position2 = *(XMFLOAT3*)meshData;
+	meshData += 12;
 
 	std::list<std::string> m_Skins;
 	std::list<UINT16> m_SkinIndices;
@@ -155,9 +140,9 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 	const UINT32 MESH = 0x4853454d; // "MESH";
 	const UINT32 VERT = 0x54524556; // "VERT";
 	const UINT32 INDX = 0x58444e49; // "INDX";
-	while ((size_t)(pBuf - pBufBase) < dataSize - 4) {
-		UINT32 magicK = *(PUINT32)pBuf;
-		pBuf += 4;
+	while ((size_t)(meshData - pBufBase) < dataSize - 4) {
+		UINT32 magicK = *(PUINT32)meshData;
+		meshData += 4;
 		switch (magicK) {
 		case SKIN:
 		{
@@ -168,12 +153,12 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 			//		print("Skin name length:", hex(skin_name_length))
 			//		skin_name = f.read(skin_name_length)
 			//		print("Skin name:", skin_name)
-			UINT32 skinsCount = *(PUINT32)pBuf;
-			pBuf += 4;
+			UINT32 skinsCount = *(PUINT32)meshData;
+			meshData += 4;
 			OutputDebugStringW(L"Skins: ");
 			while (skinsCount--) {
-				std::string skin((LPCSTR)pBuf + 1, pBuf[0]);
-				pBuf += 1 + pBuf[0];
+				std::string skin((LPCSTR)meshData + 1, meshData[0]);
+				meshData += 1 + meshData[0];
 				OutputDebugStringA(skin.c_str());
 				OutputDebugStringA(" ");
 				m_Skins.push_back(skin);
@@ -205,11 +190,11 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 			//	# read some more unknown data
 			//	if self.material_info == 0x0C14:
 			//f.read(3)
-			pBuf += 8;	// some unknown data
-			m_Faces = *(PUINT32)pBuf;
-			pBuf += 4;
-			UINT32 matType = *(PUINT32)pBuf;
-			pBuf += 4;
+			meshData += 8;	// some unknown data
+			m_Faces = *(PUINT32)meshData;
+			meshData += 4;
+			UINT32 matType = *(PUINT32)meshData;
+			meshData += 4;
 			// 0x0644, 0x0604, 0x0404, 0x0704, 0x0744, 0x0C14
 			const UINT32 MAT_404 = 0x0404;
 			const UINT32 MAT_604 = 0x0604;
@@ -223,17 +208,18 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 			case MAT_C14:
 				break;
 			default:
-				UINT32 v = *(PUINT32)pBuf;
-				pBuf += 4;
+				UINT32 v = *(PUINT32)meshData;
+				meshData += 4;
 				break;
 			}
-			std::string material((LPCSTR)pBuf + 1, pBuf[0]);
-			pBuf += 1 + pBuf[0];
+			std::string material((LPCSTR)meshData + 1, meshData[0]);
+			meshData += 1 + meshData[0];
 			m_MaterialName = material;
 
 			if (MAT_C14 == matType) {
-				pBuf += 3;
+				meshData += 3;
 			}
+			// IMPORT TODO: skins index
 		}
 		break;
 		case VERT:
@@ -262,13 +248,13 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 			//                     else:
 			//                         self.UVs.append((U,V+1.0))
 			//                 print("Vertex info ends at:",hex(f.tell()))
-			numVertices = *(PUINT32)pBuf;
-			pBuf += 4;
-			vertexStride = *(PUINT16)pBuf;
-			pBuf += 2;
+			numVertices = *(PUINT32)meshData;
+			meshData += 4;
+			vertexStride = *(PUINT16)meshData;
+			meshData += 2;
 
-			UINT32 u1 = *(PUINT16)pBuf;
-			pBuf += 2;
+			UINT32 u1 = *(PUINT16)meshData;
+			meshData += 2;
 			ULONG verticesBytes = numVertices * vertexStride;
 
 			PUINT32 pVertSize = new UINT32;
@@ -283,14 +269,14 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 				desc.ByteWidth = static_cast<UINT>(verticesBytes);
 				desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 				D3D11_SUBRESOURCE_DATA initData = {};
-				initData.pSysMem = pBuf;
+				initData.pSysMem = meshData;
 				DX::ThrowIfFailed(
 					d3dDevice->CreateBuffer(&desc, &initData, vb.GetAddressOf())
 				);
 
 				DirectX::SetDebugObjectName(vb.Get(), "ModelPLY");
 			}
-			pBuf += verticesBytes;
+			meshData += verticesBytes;
 		}
 		break;
 		case INDX:
@@ -306,10 +292,10 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 			//			else :
 			//				self.indeces.append((i0, i1, i2))
 			//				print("Indces end at", hex(f.tell() - 1))
-			numIndices = *(PUINT32)pBuf;
-			pBuf += 4;
+			numIndices = *(PUINT32)meshData;
+			meshData += 4;
 			ULONG indicesBytes = numIndices * sizeof(WORD);
-			auto indices = reinterpret_cast<const WORD*>(pBuf);
+			auto indices = reinterpret_cast<const WORD*>(meshData);
 
 			// Create index buffer
 			{
@@ -325,7 +311,7 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 
 				DirectX::SetDebugObjectName(ib.Get(), "ModelPLY");
 			}
-			pBuf += indicesBytes;
+			meshData += indicesBytes;
 		}
 		break;
 		default:
@@ -386,16 +372,37 @@ std::unique_ptr<Model> CreateFromPLY(ID3D11Device* d3dDevice, const uint8_t* pBu
 	return model;
 }
 
-std::unique_ptr<Model> LoadEntityFromPak(ID3D11Device* d3dDevice, LPCWSTR pakFile, LPCSTR entity) {
+std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Device* d3dDevice, _In_z_ const wchar_t* szFileName, _In_opt_ std::shared_ptr<IEffect> ieffect /*= nullptr*/, bool ccw /*= false*/, bool pmalpha /*= false*/)
+{
+	DX::SafeHandle hFile = CreateFileW(szFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+	if (INVALID_HANDLE_VALUE == hFile) {
+		OutputDebugStringW(L"CreateFile failed.\n");
+		return nullptr;
+	}
+	LARGE_INTEGER fileSize;
+	if (!GetFileSizeEx(hFile, &fileSize)) {
+		OutputDebugStringW(L"GetFileSizeEx failed.\n");
+		return nullptr;
+	}
+	auto dataPtr = std::make_unique<byte[]>(fileSize.LowPart);
+	DWORD readedBytes;
+	ReadFile(hFile, dataPtr.get(), fileSize.LowPart, &readedBytes, NULL);
+
+	auto model= CreateFromPLY(d3dDevice, dataPtr.get(), readedBytes, ieffect, ccw, pmalpha);
+
+	model->name = szFileName;
+	return model;
+}
+
+std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPAK(_In_ ID3D11Device* d3dDevice, _In_z_ const wchar_t* szFileName, _In_z_ const char* entity, _In_opt_ std::shared_ptr<IEffect> ieffect /*= nullptr*/, bool ccw /*= false*/, bool pmalpha /*= false*/)
+{
 	enum ZIP_SIGNATURE {
 		LocalFileHeader = 0x04034b50,
 		DataDescriptor = 0x08074b50,
 		CentralDirectoryFileHeader = 0x02014b50,
 		EOCD = 0x06054b50
 	};
-#pragma pack( show)
 #pragma pack(push, 2)
-#pragma pack( show)
 	__declspec(align(2)) struct _ZipLocalFileHeader
 	{
 		WORD version;
@@ -441,9 +448,8 @@ std::unique_ptr<Model> LoadEntityFromPak(ID3D11Device* d3dDevice, LPCWSTR pakFil
 											//22 n	Comment
 	};
 #pragma pack(pop)
-#pragma pack(show)
 
-	SafeHandle hFile = CreateFileW(pakFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+	DX::SafeHandle hFile = CreateFileW(szFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 	if (INVALID_HANDLE_VALUE == hFile) {
 		OutputDebugStringW(L"CreateFile failed.\n");
 		return nullptr;
@@ -487,8 +493,13 @@ std::unique_ptr<Model> LoadEntityFromPak(ID3D11Device* d3dDevice, LPCWSTR pakFil
 				if (StrCmpNA(entity, fileName.get(), fileBlock->header.fname_len) == 0) {
 					auto dataPtr = std::make_unique<byte[]>(fileBlock->header.comp_size);
 					ReadFile(hFile, dataPtr.get(), fileBlock->header.comp_size, &readedBytes, NULL);
-					return CreateFromPLY(d3dDevice, dataPtr.get(), fileBlock->header.comp_size,
-						nullptr, false, false);
+					// find it, it's plain, not compressed.
+					auto model = CreateFromPLY(d3dDevice, dataPtr.get(), fileBlock->header.comp_size,
+						ieffect, ccw, pmalpha);
+					std::string ent(entity);
+					std::wstring wsc(ent.begin(),ent.end());
+					model->name = wsc;
+					return model;
 				}
 				SetFilePointer(hFile, fileBlock->header.comp_size, 0, FILE_CURRENT);
 			}
@@ -549,114 +560,4 @@ std::unique_ptr<Model> LoadEntityFromPak(ID3D11Device* d3dDevice, LPCWSTR pakFil
 	}
 
 	return nullptr;
-}
-
-
-RenderingModel::RenderingModel()
-{
-}
-
-
-RenderingModel::~RenderingModel()
-{
-}
-
-LPCWSTR RenderingModel::GetClass() const
-{
-	return L"RenderingModelClass";
-}
-
-LPCWSTR RenderingModel::GetTitle() const
-{
-	return L"Rendering Model";
-}
-
-void RenderingModel::OnUpdate(DX::StepTimer const& timer)
-{
-	float time = float(timer.GetTotalSeconds());
-
-	m_world = Matrix::CreateRotationZ(cosf(time) * 0.2f);
-}
-
-void RenderingModel::OnRender()
-{
-	//m_d3dContext->RSSetState(m_states->CullCounterClockwise());
-	m_model->Draw(m_d3dContext.Get(), *m_states, m_world, m_view, m_proj, false);
-}
-
-void RenderingModel::OnActivated()
-{
-	// TODO:;
-}
-
-void RenderingModel::OnDeactivated()
-{
-	// TODO:;
-}
-
-void RenderingModel::OnSuspending()
-{
-	// TODO:;
-}
-
-void RenderingModel::OnResuming()
-{
-	// TODO:;
-}
-
-void RenderingModel::OnWindowSizeChanged(int width, int height)
-{
-	// TODO:;
-}
-
-void RenderingModel::CreateDeviceDependentResource()
-{
-	m_states = std::make_unique<CommonStates>(m_d3dDevice.Get());
-
-	//m_fxFactory = std::make_unique<EffectFactory>(m_d3dDevice.Get());
-	m_fxFactory = std::make_unique<DGSLEffectFactory>(m_d3dDevice.Get());
-
-	m_model = LoadEntityFromPak(m_d3dDevice.Get(), L"E:/Games/MenofWarAssaultSquad2Origins/resource/entity/e2.pak",
-		"-vehicle/cannon/88mm_u_boat/turret.ply");
-	//"-vehicle/airborne/a6m_m21_86/cockpit.ply");
-
-
-//m_model->UpdateEffects([](IEffect* effect) {
-//	auto lights = dynamic_cast<IEffectLights*>(effect);
-//	if (lights)
-//	{
-//		lights->SetLightingEnabled(true);
-//		lights->SetPerPixelLighting(true);
-//		lights->SetLightEnabled(0, true);
-//		lights->SetLightDiffuseColor(0, Colors::Gold);
-//		lights->SetLightEnabled(1, false);
-//		lights->SetLightEnabled(2, false);
-//	}
-
-//	auto fog = dynamic_cast<IEffectFog*>(effect);
-//	if (fog)
-//	{
-//		fog->SetFogEnabled(true);
-//		fog->SetFogColor(Colors::CornflowerBlue);
-//		fog->SetFogStart(3.f);
-//		fog->SetFogEnd(4.f);
-//	}
-//});
-
-	m_world = Matrix::Identity;
-}
-
-void RenderingModel::CreateWindowDependentResource(UINT backBufferWidth, UINT backBufferHeight)
-{
-	//m_view = Matrix::CreateLookAt(Vector3(12.f, 12.f, 12.f),
-	//	Vector3::Zero, Vector3::UnitY);
-	//m_proj = Matrix::CreatePerspectiveFieldOfView(XM_PI / 2.f,
-	//	float(backBufferWidth) / float(backBufferHeight), 0.1f, 10.f);
-}
-
-void RenderingModel::OnDeviceLost()
-{
-	m_states.reset();
-	m_fxFactory.reset();
-	m_model.reset();
 }

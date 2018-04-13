@@ -54,6 +54,7 @@ using namespace DirectX;
 #include <stdexcept>
 #include <map>
 #include <list>
+#include <locale>
 
 namespace DX
 {
@@ -81,7 +82,17 @@ namespace DX
 		{
 			throw com_exception(hr);
 		}
-	}
+	};
+
+	// Helper class for safely use HANDLE
+	class SafeHandle {
+	private:
+		HANDLE m_Handle;
+	public:
+		SafeHandle(HANDLE h) :m_Handle(h) {};
+		~SafeHandle() { CloseHandle(m_Handle); m_Handle = NULL; }
+		operator HANDLE() { return m_Handle; }
+	};
 }
 
 

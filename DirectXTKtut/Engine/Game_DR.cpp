@@ -11,6 +11,9 @@ using namespace DirectX;
 
 using Microsoft::WRL::ComPtr;
 
+static const XMVECTORF32 START_POSITION = { 0.f, -15.0f, 0.f, 0.f };
+static const float ROTATION_GAIN = 0.004f;
+static const float MOVEMENT_GAIN = 0.07f;
 
 // Windows procedure
 LRESULT CALLBACK GameWindowProc_DR(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -19,7 +22,6 @@ LRESULT CALLBACK GameWindowProc_DR(HWND hWnd, UINT message, WPARAM wParam, LPARA
 	static bool s_in_sizemove = false;
 	static bool s_in_suspend = false;
 	static bool s_minimized = false;
-	static bool s_fullscreen = false;
 	// TODO: Set s_fullscreen to true if defaulting to fullscreen.
 
 	auto game = reinterpret_cast<Game_DR*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
@@ -258,10 +260,45 @@ int Game_DR::Run(HINSTANCE hInstance) {
 	return (int)msg.wParam;
 }
 
+void Game_DR::ToggleFullscreen()
+{
+	static bool s_fullscreen = false;
+	HWND hWnd = m_deviceResources->GetWindow();
+
+	//Implements the classic ALT+ENTER fullscreen toggle
+	if (s_fullscreen)
+	{
+		SetWindowLongPtr(hWnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+		SetWindowLongPtr(hWnd, GWL_EXSTYLE, 0);
+
+		int width = 800;
+		int height = 600;
+		this->GetDefaultSize(width, height);
+
+		ShowWindow(hWnd, SW_SHOWNORMAL);
+
+		SetWindowPos(hWnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+	}
+	else
+	{
+		SetWindowLongPtr(hWnd, GWL_STYLE, 0);
+		SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_TOPMOST);
+
+		SetWindowPos(hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+
+		ShowWindow(hWnd, SW_SHOWMAXIMIZED);
+	}
+
+	s_fullscreen = !s_fullscreen;
+}
+
 Game_DR::Game_DR()
+	:m_pitch(0),
+	m_yaw(0)
 {
 	m_deviceResources = std::make_unique<DX::DeviceResources>();
 	m_deviceResources->RegisterDeviceNotify(this);
+	m_cameraPos = START_POSITION.v;
 }
 
 // Initialize the Direct3D resources required to run.
@@ -281,6 +318,10 @@ void Game_DR::Initialize(HWND window, int width, int height, bool fixedtimer)
 		m_timer.SetFixedTimeStep(true);
 		m_timer.SetTargetElapsedSeconds(1.0 / 60);
 	}
+
+	m_keyboard = std::make_unique<Keyboard>();
+	m_mouse = std::make_unique<Mouse>();
+	m_mouse->SetWindow(window);
 }
 
 #pragma region Frame Update
@@ -298,6 +339,86 @@ void Game_DR::Tick()
 // Updates the world.
 void Game_DR::Update(DX::StepTimer const& timer)
 {
+	auto kb = m_keyboard->GetState();
+	if (kb.Escape)
+		PostQuitMessage(0);
+
+	static bool bLeftAltEnterDown = false;
+	static bool bRightAltEnterDown = false;
+	if ((bLeftAltEnterDown && !(kb.LeftAlt && kb.Enter)) ||
+		(bRightAltEnterDown && !(kb.RightAlt && kb.Enter)))
+	{
+		ToggleFullscreen();
+	}
+	bLeftAltEnterDown = kb.LeftAlt && kb.Enter;
+	bRightAltEnterDown = kb.RightAlt && kb.Enter;
+
+	if (kb.Home)
+	{
+		m_cameraPos = START_POSITION.v;
+		m_pitch = m_yaw = 0;
+	}
+
+	Vector3 move = Vector3::Zero;
+
+	if (kb.Up || kb.W)
+		move.y += 1.f;
+
+	if (kb.Down || kb.S)
+		move.y -= 1.f;
+
+	if (kb.Left || kb.A)
+		move.x += 1.f;
+
+	if (kb.Right || kb.D)
+		move.x -= 1.f;
+
+	if (kb.PageUp || kb.Space)
+		move.z += 1.f;
+
+	if (kb.PageDown || kb.X)
+		move.z -= 1.f;
+
+	Quaternion q = Quaternion::CreateFromYawPitchRoll(m_yaw, m_pitch, 0.f);
+
+	move = Vector3::Transform(move, q);
+
+	move *= MOVEMENT_GAIN;
+
+	m_cameraPos += move;
+
+	//Vector3 halfBound = (Vector3(ROOM_BOUNDS.v) / Vector3(2.f))
+	//	- Vector3(0.1f, 0.1f, 0.1f);
+
+	//m_cameraPos = Vector3::Min(m_cameraPos, halfBound);
+	//m_cameraPos = Vector3::Max(m_cameraPos, -halfBound);
+
+	auto mouse = m_mouse->GetState();
+
+	if (mouse.positionMode == Mouse::MODE_RELATIVE)
+	{
+		Vector3 delta = Vector3(float(mouse.x), float(mouse.y), 0.f)
+			* ROTATION_GAIN;
+
+		m_pitch -= delta.y;
+		m_yaw -= delta.x;
+
+		// limit pitch to straight up or straight down
+		// with a little fudge-factor to avoid gimbal lock
+		float limit = XM_PI / 2.0f - 0.01f;
+		m_pitch = std::max(-limit, m_pitch);
+		m_pitch = std::min(+limit, m_pitch);
+
+		// keep longitude in sane range by wrapping
+		if (m_yaw > XM_PI)
+		{
+			m_yaw -= XM_PI * 2.0f;
+		}
+		else if (m_yaw < -XM_PI)
+		{
+			m_yaw += XM_PI * 2.0f;
+		}
+	}
 
 	// TODO: Add your game logic here.
 	OnUpdate(timer);
@@ -320,6 +441,15 @@ void Game_DR::Render()
 	auto context = m_deviceResources->GetD3DDeviceContext();
 
 	// TODO: Add your rendering code here.
+	float y = sinf(m_pitch);
+	float r = cosf(m_pitch);
+	float z = r * cosf(m_yaw);
+	float x = r * sinf(m_yaw);
+
+	XMVECTOR lookAt = m_cameraPos + Vector3(x, y, z);
+
+	m_view = XMMatrixLookAtRH(m_cameraPos, lookAt, Vector3::Up);
+
 	OnRender(context);
 
 	m_deviceResources->PIXEndEvent();
@@ -427,6 +557,9 @@ void Game_DR::CreateWindowSizeDependentResources(int width, int height)
 		float(width) / float(height), 0.1f, 10.f);
 
 	// TODO: Initialize windows-size dependent objects here.
+	m_proj = Matrix::CreatePerspectiveFieldOfView(XMConvertToRadians(70.f),
+		float(width) / float(height), 0.01f, 100.f);
+
 	OnWindowSizeDependentResources(width, height);
 }
 

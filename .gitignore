@@ -24,7 +24,11 @@
 /Dx11TutStart/Release
 /Dx11TutStart/x64/Debug
 /Dx11TutStart/x64/Release
-/MowModelViewer/Release
 /MowModelViewer/Debug
+/MowModelViewer/Release
 /MowModelViewer/x64/Debug
 /MowModelViewer/x64/Release
+/PakAnalyzer/Debug
+/PakAnalyzer/Release
+/PakAnalyzer/x64/Debug
+/PakAnalyzer/x64/Release

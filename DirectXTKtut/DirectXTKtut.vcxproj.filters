@@ -33,9 +33,6 @@
     <ClInclude Include="RenderingModel.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Helper.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Engine\DeviceResources.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -43,6 +40,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="DR_ModelRendering.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelPLY.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -69,6 +69,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="DR_ModelRendering.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="ModelPLY.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -26,6 +26,7 @@ private:
 	virtual void OnDeviceDependentResources(ID3D11Device* device) {};
 	virtual void OnWindowSizeDependentResources(int width, int height) {};
 
+	void ToggleFullscreen();
 protected:
 
 public:
@@ -74,7 +75,11 @@ protected:
 	DirectX::SimpleMath::Matrix m_world;
 	DirectX::SimpleMath::Matrix m_view;
 	DirectX::SimpleMath::Matrix m_proj;
-
+	DirectX::SimpleMath::Vector3 m_cameraPos;
+	float m_pitch;
+	float m_yaw;
 	std::unique_ptr<DirectX::CommonStates> m_states;
 	std::unique_ptr<DirectX::IEffectFactory> m_fxFactory;
+	std::unique_ptr<DirectX::Keyboard> m_keyboard;
+	std::unique_ptr<DirectX::Mouse> m_mouse;
 };
