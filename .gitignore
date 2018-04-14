@@ -32,3 +32,7 @@
 /PakAnalyzer/Release
 /PakAnalyzer/x64/Debug
 /PakAnalyzer/x64/Release
+*.log
+/PakAnalyzer/e2.pak.csv
+/PakAnalyzer/e1.pak.csv
+/PakAnalyzer/c2.pak.csv

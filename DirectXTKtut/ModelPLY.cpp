@@ -125,27 +125,44 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 	XMFLOAT3 position2 = *(XMFLOAT3*)meshData;
 	meshData += 12;
 
-	std::list<std::string> m_Skins;
-	std::list<UINT16> m_SkinIndices;
-	UINT32 m_Faces;
-	std::string m_MaterialName;
+	std::list<std::string> skinNames;
+	//std::list<UINT16> skinIndices;
+	//UINT32 facesTriangles;
+	//std::string materialName;
 
-	UINT32 numVertices = 0;
-	UINT16 vertexStride = 0;
-	UINT32 numIndices = 0;
-	ComPtr<ID3D11Buffer> vb;
-	ComPtr<ID3D11Buffer> ib;
+	//UINT32 numVertices = 0;
+	//UINT16 vertexStride = 0;
+	//UINT32 numIndices = 0;
+	int skinBlockCount = 0;
+	int meshBlocksCount = 0;
+	UINT32 skinsCount = 0;
+	//UINT32 meshCount = 0;
+	ULONG indicesBytes = 0;
+	ULONG verticesBytes = 0;
 
 	const UINT32 SKIN = 0x4e494b53; // "SKIN";
 	const UINT32 MESH = 0x4853454d; // "MESH";
 	const UINT32 VERT = 0x54524556; // "VERT";
 	const UINT32 INDX = 0x58444e49; // "INDX";
+	const UINT32 ADJA = 0x414a4441; // "ADJA";
+	const UINT32 SHDW = 0x57444853; // "SHDW";
+
+	using PlyMeshBlockVector = std::vector<std::shared_ptr<struct PlyMeshBlock>>;
+	PlyMeshBlockVector meshBlocks;
+
+	const PlyVertBlock* vertBlock{ nullptr };
+	const PlyIndxBlock* indxBlock{ nullptr };
+
 	while ((size_t)(meshData - pBufBase) < dataSize - 4) {
 		UINT32 magicK = *(PUINT32)meshData;
 		meshData += 4;
 		switch (magicK) {
 		case SKIN:
 		{
+			skinBlockCount++;
+			if (skinBlockCount > 1) {
+				throw "Too many skin blocks.";
+			}
 			//skins, = struct.unpack("<I", f.read(4))
 			//	print("Number of skins: %i at %s" % (skins, hex(f.tell())))
 			//	for i in range(0, skins) :
@@ -153,21 +170,23 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 			//		print("Skin name length:", hex(skin_name_length))
 			//		skin_name = f.read(skin_name_length)
 			//		print("Skin name:", skin_name)
-			UINT32 skinsCount = *(PUINT32)meshData;
+			skinsCount = *(PUINT32)meshData;
 			meshData += 4;
 			OutputDebugStringW(L"Skins: ");
-			while (skinsCount--) {
-				std::string skin((LPCSTR)meshData + 1, meshData[0]);
+			for (UINT32 s = 0; s < skinsCount; s++) {
+				skinNames.emplace_back((LPCSTR)meshData + 1, meshData[0]);
+				//std::string skin((LPCSTR)meshData + 1, meshData[0]);
 				meshData += 1 + meshData[0];
-				OutputDebugStringA(skin.c_str());
-				OutputDebugStringA(" ");
-				m_Skins.push_back(skin);
+				//OutputDebugStringA(skin.c_str());
+				//OutputDebugStringA(" ");
+				//skinNames.push_back(skin);
 			}
 			OutputDebugStringW(L".\n");
 		}
 		break;
 		case MESH:
 		{
+			meshBlocksCount++;
 			//# read 
 			//	f.read(0x8)
 			//	triangles, = struct.unpack("<I", f.read(4))
@@ -190,36 +209,76 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 			//	# read some more unknown data
 			//	if self.material_info == 0x0C14:
 			//f.read(3)
-			meshData += 8;	// some unknown data
-			m_Faces = *(PUINT32)meshData;
-			meshData += 4;
-			UINT32 matType = *(PUINT32)meshData;
-			meshData += 4;
-			// 0x0644, 0x0604, 0x0404, 0x0704, 0x0744, 0x0C14
-			const UINT32 MAT_404 = 0x0404;
-			const UINT32 MAT_604 = 0x0604;
-			const UINT32 MAT_644 = 0x0644;
-			const UINT32 MAT_704 = 0x0704;
-			const UINT32 MAT_744 = 0x0744;
-			const UINT32 MAT_C14 = 0x0C14;
-			const UINT32 MAT_F14 = 0x0F14;
-			switch (matType) {
-			case MAT_404:
-			case MAT_C14:
+			//UINT32 unknownFlags = *(PUINT32)meshData;	// Unknwon flags
+			//meshData += 4;
+			//UINT32 facesOffset = *(PUINT32)meshData;	// x3 is the offset of indices
+			//meshData += 4;
+			//facesTriangles = *(PUINT32)meshData;
+			//meshData += 4;
+			//UINT32 matType = *(PUINT32)meshData;
+			//meshData += 4;
+			auto meshBlock = std::make_shared<struct PlyMeshBlock>();
+			meshBlock->mesh = reinterpret_cast<const PlyMeshBlock::Mesh*>(meshData);
+			meshData += 16;
+
+			switch (meshBlock->mesh->matType) {
+			case 0x0c14:
+				break;
+			case 0x0005:
+			case 0x0401:
+			case 0x0404:
+			case 0x0405:
+			case 0x0406:
+			case 0x040c:
+			case 0x0444:
+			case 0x0445:
+			case 0x0504:
+			case 0x0505:
+			case 0x0506:
+			case 0x0544:
+			case 0x0c15:
+			case 0x0c54:
+			case 0x0c55:
+			case 0x0d14:
+				// simple material
+				break;
+			case 0x0604:
+			case 0x0605:
+			case 0x0644:
+			case 0x0645:
+			case 0x0704:
+			case 0x0705:
+			case 0x0744:
+			case 0x0745:
+			case 0x0e14:
+			case 0x0f14:
+			case 0x0f15:
+			case 0x0f54:
+			case 0x0f55:
+				// bump material
+				meshData += 4;
 				break;
 			default:
-				UINT32 v = *(PUINT32)meshData;
 				meshData += 4;
 				break;
 			}
-			std::string material((LPCSTR)meshData + 1, meshData[0]);
+			//std::string material((LPCSTR)meshData + 1, meshData[0]);
+			//materialName = material;
+			meshBlock->name.assign((LPCSTR)meshData + 1, (LPCSTR)meshData + 1 + meshData[0]); // = std::string((LPCSTR)meshData + 1, meshData[0]);
 			meshData += 1 + meshData[0];
-			m_MaterialName = material;
 
-			if (MAT_C14 == matType) {
+			if (0x0C14 == meshBlock->mesh->matType) {
 				meshData += 3;
 			}
 			// IMPORT TODO: skins index
+			if (skinBlockCount) {
+				meshBlock->skinIndex = reinterpret_cast<const PlyMeshBlock::SkinIndex*>(meshData);
+				meshData += 1 + *(PUINT16)meshData[0];
+			}
+			else {
+				meshBlock->skinIndex = nullptr;
+			}
+			meshBlocks.push_back(meshBlock);
 		}
 		break;
 		case VERT:
@@ -248,34 +307,17 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 			//                     else:
 			//                         self.UVs.append((U,V+1.0))
 			//                 print("Vertex info ends at:",hex(f.tell()))
-			numVertices = *(PUINT32)meshData;
-			meshData += 4;
-			vertexStride = *(PUINT16)meshData;
-			meshData += 2;
+			//numVertices = *(PUINT32)meshData;
+			//meshData += 4;
+			//vertexStride = *(PUINT16)meshData;
+			//meshData += 2;
 
-			UINT32 u1 = *(PUINT16)meshData;
-			meshData += 2;
-			ULONG verticesBytes = numVertices * vertexStride;
+			//UINT16 u1 = *(PUINT16)meshData;
+			//meshData += 2;
+			vertBlock = reinterpret_cast<const PlyVertBlock*>(meshData);
+			meshData += 8;
 
-			PUINT32 pVertSize = new UINT32;
-			if (!InitOnceExecuteOnce(&g_InitOnce, InitializeDecl, &vertexStride, (LPVOID*)&pVertSize))
-				throw std::exception("Vertex InputElement Layout initialization failed");
-			assert(*pVertSize == vertexStride);
-
-			// Create vertex buffer
-			{
-				D3D11_BUFFER_DESC desc = {};
-				desc.Usage = D3D11_USAGE_DEFAULT;
-				desc.ByteWidth = static_cast<UINT>(verticesBytes);
-				desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-				D3D11_SUBRESOURCE_DATA initData = {};
-				initData.pSysMem = meshData;
-				DX::ThrowIfFailed(
-					d3dDevice->CreateBuffer(&desc, &initData, vb.GetAddressOf())
-				);
-
-				DirectX::SetDebugObjectName(vb.Get(), "ModelPLY");
-			}
+			verticesBytes = vertBlock->vert.numVertices * vertBlock->vert.vertexStride;
 			meshData += verticesBytes;
 		}
 		break;
@@ -292,25 +334,12 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 			//			else :
 			//				self.indeces.append((i0, i1, i2))
 			//				print("Indces end at", hex(f.tell() - 1))
-			numIndices = *(PUINT32)meshData;
+			//numIndices = *(PUINT32)meshData;
+
+			indxBlock = reinterpret_cast<const PlyIndxBlock*>(meshData);
 			meshData += 4;
-			ULONG indicesBytes = numIndices * sizeof(WORD);
-			auto indices = reinterpret_cast<const WORD*>(meshData);
 
-			// Create index buffer
-			{
-				D3D11_BUFFER_DESC desc = {};
-				desc.Usage = D3D11_USAGE_DEFAULT;
-				desc.ByteWidth = static_cast<UINT>(indicesBytes);
-				desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-				D3D11_SUBRESOURCE_DATA initData = {};
-				initData.pSysMem = indices;
-				DX::ThrowIfFailed(
-					d3dDevice->CreateBuffer(&desc, &initData, ib.GetAddressOf())
-				);
-
-				DirectX::SetDebugObjectName(ib.Get(), "ModelPLY");
-			}
+			indicesBytes = indxBlock->numIndices * sizeof(WORD);
 			meshData += indicesBytes;
 		}
 		break;
@@ -318,6 +347,42 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 			OutputDebugStringW(L"Invalid ply block.\n");
 			return nullptr;
 		}
+	}
+
+
+	PUINT32 pVertSize = new UINT32;
+	if (!InitOnceExecuteOnce(&g_InitOnce, InitializeDecl, (LPVOID)&(vertBlock->vert.vertexStride), (LPVOID*)&pVertSize))
+		throw std::exception("Vertex InputElement Layout initialization failed");
+	assert(*pVertSize == vertBlock->vert.vertexStride);
+
+	ComPtr<ID3D11Buffer> vb;
+	// Create vertex buffer
+	{
+		D3D11_BUFFER_DESC desc = {};
+		desc.Usage = D3D11_USAGE_DEFAULT;
+		desc.ByteWidth = verticesBytes;
+		desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+		D3D11_SUBRESOURCE_DATA initData = { vertBlock->data };
+		DX::ThrowIfFailed(
+			d3dDevice->CreateBuffer(&desc, &initData, vb.GetAddressOf())
+		);
+
+		DirectX::SetDebugObjectName(vb.Get(), "ModelPLY");
+	}
+
+	// Create index buffer
+	ComPtr<ID3D11Buffer> ib;
+	{
+		D3D11_BUFFER_DESC desc = {};
+		desc.Usage = D3D11_USAGE_DEFAULT;
+		desc.ByteWidth = indicesBytes;
+		desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+		D3D11_SUBRESOURCE_DATA initData = { indxBlock->data };
+		DX::ThrowIfFailed(
+			d3dDevice->CreateBuffer(&desc, &initData, ib.GetAddressOf())
+		);
+
+		DirectX::SetDebugObjectName(ib.Get(), "ModelPLY");
 	}
 
 	// Create input layout and effect
@@ -346,16 +411,6 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 		DirectX::SetDebugObjectName(il.Get(), "ModelPLY");
 	}
 
-	auto part = new ModelMeshPart();
-	part->indexCount = numIndices;
-	part->startIndex = 0;
-	part->vertexStride = vertexStride;
-	part->inputLayout = il;
-	part->indexBuffer = ib;
-	part->vertexBuffer = vb;
-	part->effect = ieffect;
-	part->vbDecl = g_vbdecl;
-
 	auto mesh = std::make_shared<ModelMesh>();
 	mesh->ccw = ccw;
 	mesh->pmalpha = pmalpha;
@@ -364,7 +419,26 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 		XMVectorSet(position2.x, position2.y, position2.z, 1.0f));
 	BoundingSphere::CreateFromBoundingBox(mesh->boundingSphere, mesh->boundingBox);
 
-	mesh->meshParts.emplace_back(part);
+	UINT partIndexCount = 0;
+	for (PlyMeshBlockVector::iterator m = meshBlocks.begin(); m != meshBlocks.end(); m++) {
+		MaterialRecordPLY materials;
+		materials.name = (*m)->name;
+
+
+		auto part = new ModelMeshPart();
+		part->indexCount = (*m)->mesh->facesTriangles * 3;
+		partIndexCount += part->indexCount;
+		part->startIndex = (*m)->mesh->facesOffset * 3;
+		part->vertexStride = vertBlock->vert.vertexStride;
+		part->inputLayout = il;
+		part->indexBuffer = ib;
+		part->vertexBuffer = vb;
+		part->effect = ieffect;
+		part->vbDecl = g_vbdecl;
+
+		mesh->meshParts.emplace_back(part);
+	}
+	assert(indxBlock->numIndices == partIndexCount);
 
 	std::unique_ptr<Model> model(new Model());
 	model->meshes.emplace_back(mesh);
@@ -388,7 +462,7 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 	DWORD readedBytes;
 	ReadFile(hFile, dataPtr.get(), fileSize.LowPart, &readedBytes, NULL);
 
-	auto model= CreateFromPLY(d3dDevice, dataPtr.get(), readedBytes, ieffect, ccw, pmalpha);
+	auto model = CreateFromPLY(d3dDevice, dataPtr.get(), readedBytes, ieffect, ccw, pmalpha);
 
 	model->name = szFileName;
 	return model;
@@ -496,10 +570,10 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPAK(_In_ ID3D11Devic
 					// find it, it's plain, not compressed.
 					auto model = CreateFromPLY(d3dDevice, dataPtr.get(), fileBlock->header.comp_size,
 						ieffect, ccw, pmalpha);
-					std::string ent(entity);
-					std::wstring wsc(ent.begin(),ent.end());
-					model->name = wsc;
-					return model;
+					if (model == nullptr)
+						throw "Load model fail!";
+					model->name.assign(entity, entity + strlen(entity));
+					//return model;
 				}
 				SetFilePointer(hFile, fileBlock->header.comp_size, 0, FILE_CURRENT);
 			}
@@ -517,7 +591,6 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPAK(_In_ ID3D11Devic
 			}
 			char* fileName = new char[cdfHeader.fname_len + 1]{ 0 };
 			ReadFile(hFile, fileName, cdfHeader.fname_len, &readedBytes, NULL);
-			delete[] fileName; fileName = nullptr;
 
 			if (cdfHeader.extra_field_len) {
 				SetFilePointer(hFile, cdfHeader.extra_field_len, 0, FILE_CURRENT);
@@ -526,6 +599,7 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPAK(_In_ ID3D11Devic
 			if (cdfHeader.fcomment_len) {
 				SetFilePointer(hFile, cdfHeader.fcomment_len, 0, FILE_CURRENT);
 			}
+			delete[] fileName; fileName = nullptr;
 		}
 		break;
 		case EOCD:

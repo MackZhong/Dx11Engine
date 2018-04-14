@@ -393,9 +393,7 @@ std::unique_ptr<Model> LoadEntityFromPak(ID3D11Device* d3dDevice, LPCWSTR pakFil
 		CentralDirectoryFileHeader = 0x02014b50,
 		EOCD = 0x06054b50
 	};
-#pragma pack( show)
 #pragma pack(push, 2)
-#pragma pack( show)
 	__declspec(align(2)) struct _ZipLocalFileHeader
 	{
 		WORD version;
@@ -441,7 +439,6 @@ std::unique_ptr<Model> LoadEntityFromPak(ID3D11Device* d3dDevice, LPCWSTR pakFil
 											//22 n	Comment
 	};
 #pragma pack(pop)
-#pragma pack(show)
 
 	SafeHandle hFile = CreateFileW(pakFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 	if (INVALID_HANDLE_VALUE == hFile) {

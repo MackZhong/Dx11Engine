@@ -11,7 +11,7 @@ using namespace DirectX;
 
 using Microsoft::WRL::ComPtr;
 
-static const XMVECTORF32 START_POSITION = { 0.f, -15.0f, 0.f, 0.f };
+static const XMVECTORF32 START_POSITION = { -30.f, -30.0f, -30.f, 0.f };
 static const float ROTATION_GAIN = 0.004f;
 static const float MOVEMENT_GAIN = 0.07f;
 
@@ -339,6 +339,34 @@ void Game_DR::Tick()
 // Updates the world.
 void Game_DR::Update(DX::StepTimer const& timer)
 {
+	auto mouse = m_mouse->GetState();
+
+	if (mouse.positionMode == Mouse::MODE_RELATIVE)
+	{
+		Vector3 delta = Vector3(float(mouse.x), float(mouse.y), 0.f)
+			* ROTATION_GAIN;
+
+		m_pitch -= delta.y;
+		m_yaw -= delta.x;
+
+		// limit pitch to straight up or straight down
+		// with a little fudge-factor to avoid gimbal lock
+		float limit = XM_PI / 2.0f - 0.01f;
+		m_pitch = std::max(-limit, m_pitch);
+		m_pitch = std::min(+limit, m_pitch);
+
+		// keep longitude in sane range by wrapping
+		if (m_yaw > XM_PI)
+		{
+			m_yaw -= XM_PI * 2.0f;
+		}
+		else if (m_yaw < -XM_PI)
+		{
+			m_yaw += XM_PI * 2.0f;
+		}
+	}
+	m_mouse->SetMode(mouse.leftButton ? Mouse::MODE_RELATIVE : Mouse::MODE_ABSOLUTE);
+
 	auto kb = m_keyboard->GetState();
 	if (kb.Escape)
 		PostQuitMessage(0);
@@ -392,33 +420,6 @@ void Game_DR::Update(DX::StepTimer const& timer)
 
 	//m_cameraPos = Vector3::Min(m_cameraPos, halfBound);
 	//m_cameraPos = Vector3::Max(m_cameraPos, -halfBound);
-
-	auto mouse = m_mouse->GetState();
-
-	if (mouse.positionMode == Mouse::MODE_RELATIVE)
-	{
-		Vector3 delta = Vector3(float(mouse.x), float(mouse.y), 0.f)
-			* ROTATION_GAIN;
-
-		m_pitch -= delta.y;
-		m_yaw -= delta.x;
-
-		// limit pitch to straight up or straight down
-		// with a little fudge-factor to avoid gimbal lock
-		float limit = XM_PI / 2.0f - 0.01f;
-		m_pitch = std::max(-limit, m_pitch);
-		m_pitch = std::min(+limit, m_pitch);
-
-		// keep longitude in sane range by wrapping
-		if (m_yaw > XM_PI)
-		{
-			m_yaw -= XM_PI * 2.0f;
-		}
-		else if (m_yaw < -XM_PI)
-		{
-			m_yaw += XM_PI * 2.0f;
-		}
-	}
 
 	// TODO: Add your game logic here.
 	OnUpdate(timer);

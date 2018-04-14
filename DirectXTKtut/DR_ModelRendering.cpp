@@ -23,8 +23,8 @@ void DR_ModelRendering::OnDeviceDependentResources(ID3D11Device * device)
 	//SetCurrentDirectoryW(L"assets");
 	//m_model = Model::CreateFromCMO(device, L"cup.cmo", *m_fxFactory);
 	//SetCurrentDirectoryW(path.get());
-	m_model = ModelPLY::CreateFromPAK(device, L"E:/Games/Men of War Assault Squad/resource/entity/e2.pak",
-		"-vehicle/cannon/88mm_u_boat/turret.ply");
+	m_model = ModelPLY::CreateFromPAK(device, L"D:/Games/Men of War Assault Squad 2/resource/entity/c2.pak",
+		"construction/monastery/brok_wall1/wall1.ply");
 	//"-vehicle/airborne/a6m_m21_86/cockpit.ply");
 	if (nullptr == m_model) {
 		throw "Load model failed.";
