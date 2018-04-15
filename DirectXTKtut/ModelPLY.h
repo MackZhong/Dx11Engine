@@ -33,7 +33,7 @@ struct PlyMeshBlock {
 	const Mesh* mesh;
 	struct SkinIndex {
 		UINT16 skin2;
-		USHORT* indexs;
+		USHORT indexs[1];
 	};
 	const SkinIndex *skinIndex;
 	std::wstring name;
@@ -80,4 +80,47 @@ struct PlyMaterialBump
 	DirectX::XMFLOAT4   Diffuse;
 	std::string bump;
 	bool blend;
+};
+
+
+// Vertex struct for Visual Studio Shader Designer (DGSL) holding position, normal,
+// tangent, color (RGBA), texture mapping information, and skinning weights
+struct VertexPositionNormalColorTextureSkinning : public VertexPositionNormalColorTexture
+{
+	VertexPositionNormalColorTextureSkinning() = default;
+
+	VertexPositionNormalColorTextureSkinning(const VertexPositionNormalColorTextureSkinning&) = default;
+	VertexPositionNormalColorTextureSkinning& operator=(const VertexPositionNormalColorTextureSkinning&) = default;
+
+#if !defined(_MSC_VER) || _MSC_VER >= 1900
+	VertexPositionNormalColorTextureSkinning(VertexPositionNormalColorTextureSkinning&&) = default;
+	VertexPositionNormalColorTextureSkinning& operator=(VertexPositionNormalColorTextureSkinning&&) = default;
+#endif
+
+	uint32_t indices;
+	uint32_t weights;
+
+	VertexPositionNormalColorTextureSkinning(XMFLOAT3 const& position, XMFLOAT3 const& normal, XMFLOAT4 const& color,
+		XMFLOAT2 const& textureCoordinate, XMUINT4 const& indices, XMFLOAT4 const& weights)
+		: VertexPositionNormalColorTexture(position, normal, color, textureCoordinate)
+	{
+		SetBlendIndices(indices);
+		SetBlendWeights(weights);
+	}
+
+	VertexPositionNormalColorTextureSkinning(FXMVECTOR position, FXMVECTOR normal, FXMVECTOR color, CXMVECTOR textureCoordinate,
+		XMUINT4 const& indices, CXMVECTOR weights)
+		: VertexPositionNormalColorTexture(position, normal, color, textureCoordinate)
+	{
+		SetBlendIndices(indices);
+		SetBlendWeights(weights);
+	}
+
+	void __cdecl SetBlendIndices(XMUINT4 const& iindices);
+
+	void __cdecl SetBlendWeights(XMFLOAT4 const& iweights) { SetBlendWeights(XMLoadFloat4(&iweights)); }
+	void XM_CALLCONV SetBlendWeights(FXMVECTOR iweights);
+
+	static const int InputElementCount = 6;
+	static const D3D11_INPUT_ELEMENT_DESC InputElements[InputElementCount];
 };

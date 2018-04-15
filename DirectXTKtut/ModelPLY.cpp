@@ -1,6 +1,6 @@
 #include "EnginePCH.h"
 #include "ModelPLY.h"
-
+#include "PakFileReader.h"
 
 ModelPLY::ModelPLY()
 {
@@ -9,6 +9,33 @@ ModelPLY::ModelPLY()
 
 ModelPLY::~ModelPLY()
 {
+}
+
+//--------------------------------------------------------------------------------------
+// Vertex struct holding position, normal vector, color, and texture mapping information.VertexPositionNormalColorTextureSkinning
+const D3D11_INPUT_ELEMENT_DESC VertexPositionNormalColorTextureSkinning::InputElements[] =
+{
+	{ "SV_Position", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+{ "NORMAL",      0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+{ "COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+{ "TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+{ "BLENDINDICES",0, DXGI_FORMAT_R8G8B8A8_UINT,      0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+{ "BLENDWEIGHT", 0, DXGI_FORMAT_R8G8B8A8_UNORM,     0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+};
+static_assert(VertexPositionNormalColorTextureSkinning::InputElementCount == VertexPositionNormalColorTexture::InputElementCount + 2, "layout mismatch");
+
+static_assert(sizeof(VertexPositionNormalColorTextureSkinning) == 56, "Vertex struct/layout mismatch");
+
+void VertexPositionNormalColorTextureSkinning::SetBlendIndices(XMUINT4 const& iindices)
+{
+	this->indices = ((iindices.w & 0xff) << 24) | ((iindices.z & 0xff) << 16) | ((iindices.y & 0xff) << 8) | (iindices.x & 0xff);
+}
+
+void XM_CALLCONV VertexPositionNormalColorTextureSkinning::SetBlendWeights(FXMVECTOR iweights)
+{
+	DirectX::PackedVector::XMUBYTEN4 packed;
+	DirectX::PackedVector::XMStoreUByteN4(&packed, iweights);
+	this->weights = packed.v;
 }
 
 namespace
@@ -87,6 +114,12 @@ namespace
 				VertexPositionNormalTangentColorTexture::InputElements,
 				VertexPositionNormalTangentColorTexture::InputElements + VertexPositionNormalTangentColorTexture::InputElementCount);
 			vertexSize = sizeof(VertexPositionNormalTangentColorTexture);
+			break;
+		case 56:
+			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
+				VertexPositionNormalColorTextureSkinning::InputElements,
+				VertexPositionNormalColorTextureSkinning::InputElements + VertexPositionNormalColorTextureSkinning::InputElementCount);
+			vertexSize = sizeof(VertexPositionNormalColorTextureSkinning);
 			break;
 		case 60:
 			g_vbdecl = std::make_shared<std::vector<D3D11_INPUT_ELEMENT_DESC>>(
@@ -273,7 +306,7 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 			// IMPORT TODO: skins index
 			if (skinBlockCount) {
 				meshBlock->skinIndex = reinterpret_cast<const PlyMeshBlock::SkinIndex*>(meshData);
-				meshData += 1 + *(PUINT16)meshData[0];
+				meshData += 1 + meshData[0];
 			}
 			else {
 				meshBlock->skinIndex = nullptr;
@@ -468,170 +501,199 @@ std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPLY(_In_ ID3D11Devic
 	return model;
 }
 
-std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPAK(_In_ ID3D11Device* d3dDevice, _In_z_ const wchar_t* szFileName, _In_z_ const char* entity, _In_opt_ std::shared_ptr<IEffect> ieffect /*= nullptr*/, bool ccw /*= false*/, bool pmalpha /*= false*/)
+std::unique_ptr<DirectX::Model> __cdecl ModelPLY::CreateFromPAK(_In_ ID3D11Device* d3dDevice, _In_z_ const wchar_t* szPakFile, _In_z_ const char* szEntityFile, _In_opt_ std::shared_ptr<IEffect> ieffect /*= nullptr*/, bool ccw /*= false*/, bool pmalpha /*= false*/)
 {
-	enum ZIP_SIGNATURE {
-		LocalFileHeader = 0x04034b50,
-		DataDescriptor = 0x08074b50,
-		CentralDirectoryFileHeader = 0x02014b50,
-		EOCD = 0x06054b50
-	};
-#pragma pack(push, 2)
-	__declspec(align(2)) struct _ZipLocalFileHeader
-	{
-		WORD version;
-		WORD bitflags;
-		WORD comp_method;
-		WORD lastModFileTime;
-		WORD lastModFileDate;
-		DWORD crc_32;
-		DWORD comp_size;
-		DWORD uncompr_size;
-		WORD fname_len;
-		WORD extra_field_len;
-	};
-	__declspec(align(2)) struct _ZipCDFHeader
-	{
-		WORD version_madeby;
-		WORD version_needed;
-		WORD bitflags;
-		WORD comp_method;
-		WORD lastModFileTime;
-		WORD lastModFileDate;
-		DWORD crc_32;
-		DWORD comp_size;
-		DWORD uncompr_size;
-		WORD fname_len;
-		WORD extra_field_len;
-		WORD fcomment_len;
-		WORD disk_num_start;
-		WORD internal_fattribute;
-		DWORD external_fattribute;
-		DWORD relative_offset;
-	};
-	__declspec(align(2)) struct _ZipEOCD	//Offset Bytes Description
-	{
-		//0	4	End of central directory signature = 0x06054b50
-		WORD numOfDisk;					//4	2	Number of this disk
-		WORD diskCDStart;					//6	2	Disk where central directory starts
-		WORD numOfCD;						//8	2	Number of central directory records on this disk
-		WORD numTotalCD;					//10 2	Total number of central directory records
-		DWORD sizeCD;						//12 4	Size of central directory(bytes)
-		DWORD offsetCDStart;				//16 4	Offset of start of central directory, relative to start of archive
-		WORD lenComment;					//20 2	Comment length(n)
-											//22 n	Comment
-	};
-#pragma pack(pop)
+	auto fileReader = PakFileReader::GetReader(szPakFile);
+	auto pos = fileReader->FindFilePosition(szEntityFile);
+	if (!pos)
+		return nullptr;
 
-	DX::SafeHandle hFile = CreateFileW(szFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+	DWORD dwErr;
+	DX::SafeHandle hFile = CreateFileW(szPakFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 	if (INVALID_HANDLE_VALUE == hFile) {
+		dwErr = GetLastError();
 		OutputDebugStringW(L"CreateFile failed.\n");
-		return nullptr;
+		throw "Open file error";
+		//return nullptr;
 	}
+
 	LARGE_INTEGER fileSize;
-	if (!GetFileSizeEx(hFile, &fileSize)) {
-		OutputDebugStringW(L"GetFileSizeEx failed.\n");
-		return nullptr;
+	if (!GetFileSizeEx(hFile, &fileSize) || fileSize.LowPart < (pos->offset + pos->size)) {
+		dwErr = GetLastError();
+		OutputDebugStringW(L"GetFileSizeEx failed or file size error.\n");
+		throw "GetFileSizeEx failed or file size error";
+		//return nullptr;
 	}
 
-	struct _FileBlock {
-		_ZipLocalFileHeader header;
-		DWORD offset;
-	};
-	typedef std::map < std::string, std::shared_ptr<_FileBlock>> FileBlockMapType;
-	FileBlockMapType fileBlockMap;
-
-	DWORD signature;
 	DWORD readedBytes;
-	while (ReadFile(hFile, &signature, 4, &readedBytes, NULL)) {
-		switch (signature) {
-		case LocalFileHeader:
-		{
-			auto fileBlock = std::make_shared<_FileBlock>();
-			DWORD stToRead = sizeof(_ZipLocalFileHeader);
-			if (!ReadFile(hFile, &fileBlock->header, stToRead, &readedBytes, NULL)) {
-				OutputDebugStringW(L"ReadFile for Local file header failed.\n");
-				break;
-			}
-			//char* fileName = new char[fileBlock->header.fname_len + 1]{ 0 };
-			auto fileName = std::make_unique<char[]>(fileBlock->header.fname_len + 1);
-			ReadFile(hFile, fileName.get(), fileBlock->header.fname_len, &readedBytes, NULL);
-			fileBlockMap[fileName.get()] = fileBlock;
-			//delete[] fileName; fileName = nullptr;
+	SetFilePointer(hFile, pos->offset, nullptr, FILE_BEGIN);
 
-			if (fileBlock->header.extra_field_len) {
-				SetFilePointer(hFile, fileBlock->header.extra_field_len, 0, FILE_CURRENT);
-			}
-			fileBlock->offset = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
-			if (fileBlock->header.comp_size) {
-				if (StrCmpNA(entity, fileName.get(), fileBlock->header.fname_len) == 0) {
-					auto dataPtr = std::make_unique<byte[]>(fileBlock->header.comp_size);
-					ReadFile(hFile, dataPtr.get(), fileBlock->header.comp_size, &readedBytes, NULL);
-					// find it, it's plain, not compressed.
-					auto model = CreateFromPLY(d3dDevice, dataPtr.get(), fileBlock->header.comp_size,
-						ieffect, ccw, pmalpha);
-					if (model == nullptr)
-						throw "Load model fail!";
-					model->name.assign(entity, entity + strlen(entity));
-					//return model;
-				}
-				SetFilePointer(hFile, fileBlock->header.comp_size, 0, FILE_CURRENT);
-			}
-		}
-		break;
-		case DataDescriptor:
-			OutputDebugStringW(L"Data descriptor not supported.\n");
-			break;
-		case CentralDirectoryFileHeader:
-		{
-			_ZipCDFHeader cdfHeader;
-			if (!ReadFile(hFile, &cdfHeader, sizeof(cdfHeader), &readedBytes, NULL)) {
-				OutputDebugStringW(L"ReadFile for Central directory file header failed.\n");
-				break;
-			}
-			char* fileName = new char[cdfHeader.fname_len + 1]{ 0 };
-			ReadFile(hFile, fileName, cdfHeader.fname_len, &readedBytes, NULL);
-
-			if (cdfHeader.extra_field_len) {
-				SetFilePointer(hFile, cdfHeader.extra_field_len, 0, FILE_CURRENT);
-			}
-
-			if (cdfHeader.fcomment_len) {
-				SetFilePointer(hFile, cdfHeader.fcomment_len, 0, FILE_CURRENT);
-			}
-			delete[] fileName; fileName = nullptr;
-		}
-		break;
-		case EOCD:
-		{
-			_ZipEOCD eocdBlock;
-			DWORD stToRead = sizeof(eocdBlock);
-			if (!ReadFile(hFile, &eocdBlock, stToRead, &readedBytes, NULL)) {
-				OutputDebugStringW(L"ReadFile for End of central directory record failed.\n");
-				break;
-			}
-
-			if (eocdBlock.lenComment) {
-				SetFilePointer(hFile, eocdBlock.lenComment, 0, FILE_CURRENT);
-			}
-		}
-		break;
-		default:
-			OutputDebugStringW(L"Unknown zip block.\n");
-			break;
-		}
-		DWORD pos = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
-		if (pos >= fileSize.LowPart) {
-			OutputDebugStringW(L"File Ended.\n");
-			break;;
-		}
+	auto dataPtr = std::make_unique<byte[]>(pos->size);
+	if (!ReadFile(hFile, dataPtr.get(), pos->size, &readedBytes, NULL)) {
+		dwErr = GetLastError();
+		OutputDebugStringW(L"ReadFile for Local file failed.\n");
+		throw "ReadFile for Local file failed";
 	}
-
-	FileBlockMapType::iterator finded = fileBlockMap.find(entity);
-	if (finded == fileBlockMap.end())
-	{
-		return nullptr;
+	if (*(PUINT32)dataPtr.get() != ZIP_SIGNATURE_LOCAL_FILE_HEADER) {
+		OutputDebugStringW(L"Invalid Local File Header position.\n");
+		throw "Invalid Local File Header position";
 	}
+	const _ZipLocalFileHeader* pLF = reinterpret_cast<_ZipLocalFileHeader*>(dataPtr.get() + 4);
+
+	ULONG sizeHeader = 4 + sizeof(_ZipLocalFileHeader) + pLF->fname_len + pLF->extra_field_len;
+	readedBytes -= sizeHeader;
+	auto model = CreateFromPLY(d3dDevice, dataPtr.get() + sizeHeader, readedBytes,
+		ieffect, ccw, pmalpha);
+	if (model == nullptr)
+		throw "Load model fail!";
+	model->name.assign(szEntityFile, szEntityFile + strlen(szEntityFile));
+	return model;
+
+	//ReadFile(hFile, &signature, 4, &readedBytes, NULL);
+	//if (signature != LocalFileHeader) {
+	//	OutputDebugStringW(L"Invalid Local File Header position.\n");
+	//	throw "Invalid Local File Header position";
+	//}
+
+	//DWORD stToRead = sizeof(_ZipLocalFileHeader);
+	//auto lfHeader = std::make_unique<_ZipLocalFileHeader>();
+	//if (!ReadFile(hFile, lfHeader.get(), stToRead, &readedBytes, NULL)) {
+	//	dwErr = GetLastError();
+	//	OutputDebugStringW(L"ReadFile for Local file header failed.\n");
+	//	throw "ReadFile for Local file header failed";
+	//}
+	//stToRead = lfHeader->fname_len + lfHeader->extra_field_len + lfHeader->comp_size;
+	//auto fileData = std::make_unique<byte[]>(stToRead);
+
+	//if (!ReadFile(hFile, fileData.get(), stToRead, &readedBytes, NULL)) {
+	//	dwErr = GetLastError();
+	//	OutputDebugStringW(L"Read Local File data failed.\n");
+	//	throw "Read Local File data failed";
+	//}
+	//std::string fileName(fileData.get(), fileData.get() + lfHeader->fname_len);
+	//if (fileName.compare(entity)) {
+	//	OutputDebugStringW(L"Entity or file name mistake.\n");
+	//	throw "Entity or file name mistake";
+	//}
+	//readedBytes -= lfHeader->fname_len + lfHeader->extra_field_len;
+	//if (readedBytes != lfHeader->comp_size) {
+	//	OutputDebugStringW(L"Entity size mistake.\n");
+	//	throw "Entity size mistake";
+	//}
+	//auto model = CreateFromPLY(d3dDevice, fileData.get() + lfHeader->fname_len + lfHeader->extra_field_len, readedBytes,
+	//	ieffect, ccw, pmalpha);
+	//if (model == nullptr)
+	//	throw "Load model fail!";
+	//model->name.assign(entity, entity + strlen(entity));
+	//return model;
+
+	//delete[] fileName; fileName = nullptr;
+
+//	SetFilePointer(hFile, fileBlock->header.extra_field_len, 0, FILE_CURRENT);
+//	fileBlock->offset = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
+//	if (fileBlock->header.comp_size) {
+//		if (StrCmpNA(entity, fileName.get(), fileBlock->header.fname_len) == 0) {
+//			auto dataPtr = std::make_unique<byte[]>(fileBlock->header.comp_size);
+//			ReadFile(hFile, dataPtr.get(), fileBlock->header.comp_size, &readedBytes, NULL);
+//			// find it, it's plain, not compressed.
+//		}
+//		else {
+//			SetFilePointer(hFile, fileBlock->header.comp_size, 0, FILE_CURRENT);
+//		}
+//	}
+
+//struct _FileBlock {
+//	_ZipLocalFileHeader header;
+//	DWORD offset;
+//};
+//typedef std::map < std::string, std::shared_ptr<_FileBlock>> FileBlockMapType;
+//FileBlockMapType fileBlockMap;
+
+//DWORD signature;
+//DWORD readedBytes;
+//while (ReadFile(hFile, &signature, 4, &readedBytes, NULL)) {
+//	switch (signature) {
+//	case LocalFileHeader:
+//	{
+//		auto fileBlock = std::make_shared<_FileBlock>();
+//		DWORD stToRead = sizeof(_ZipLocalFileHeader);
+//		if (!ReadFile(hFile, &fileBlock->header, stToRead, &readedBytes, NULL)) {
+//			OutputDebugStringW(L"ReadFile for Local file header failed.\n");
+//			break;
+//		}
+//		//char* fileName = new char[fileBlock->header.fname_len + 1]{ 0 };
+//		auto fileName = std::make_unique<char[]>(fileBlock->header.fname_len + 1);
+//		ReadFile(hFile, fileName.get(), fileBlock->header.fname_len, &readedBytes, NULL);
+//		fileBlockMap[fileName.get()] = fileBlock;
+//		//delete[] fileName; fileName = nullptr;
+
+//		SetFilePointer(hFile, fileBlock->header.extra_field_len, 0, FILE_CURRENT);
+//		fileBlock->offset = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
+//		if (fileBlock->header.comp_size) {
+//			if (StrCmpNA(entity, fileName.get(), fileBlock->header.fname_len) == 0) {
+//				auto dataPtr = std::make_unique<byte[]>(fileBlock->header.comp_size);
+//				ReadFile(hFile, dataPtr.get(), fileBlock->header.comp_size, &readedBytes, NULL);
+//				// find it, it's plain, not compressed.
+//				auto model = CreateFromPLY(d3dDevice, dataPtr.get(), fileBlock->header.comp_size,
+//					ieffect, ccw, pmalpha);
+//				if (model == nullptr)
+//					throw "Load model fail!";
+//				model->name.assign(entity, entity + strlen(entity));
+//				//return model;
+//			}
+//			else {
+//				SetFilePointer(hFile, fileBlock->header.comp_size, 0, FILE_CURRENT);
+//			}
+//		}
+//	}
+//	break;
+//	case DataDescriptor:
+//		OutputDebugStringW(L"Data descriptor not supported.\n");
+//		break;
+//	case CentralDirectoryFileHeader:
+//	{
+//		_ZipCDFHeader cdfHeader;
+//		if (!ReadFile(hFile, &cdfHeader, sizeof(_ZipCDFHeader), &readedBytes, NULL)) {
+//			OutputDebugStringW(L"ReadFile for Central directory file header failed.\n");
+//			break;
+//		}
+//		char* fileName = new char[cdfHeader.fname_len + 1]{ 0 };
+//		ReadFile(hFile, fileName, cdfHeader.fname_len, &readedBytes, NULL);
+
+//		SetFilePointer(hFile, cdfHeader.extra_field_len + cdfHeader.fcomment_len, 0, FILE_CURRENT);
+//		delete[] fileName; fileName = nullptr;
+//	}
+//	break;
+//	case EOCD:
+//	{
+//		_ZipEOCD eocdBlock;
+//		DWORD stToRead = sizeof(eocdBlock);
+//		if (!ReadFile(hFile, &eocdBlock, stToRead, &readedBytes, NULL)) {
+//			OutputDebugStringW(L"ReadFile for End of central directory record failed.\n");
+//			break;
+//		}
+
+//		if (eocdBlock.lenComment) {
+//			SetFilePointer(hFile, eocdBlock.lenComment, 0, FILE_CURRENT);
+//		}
+//	}
+//	break;
+//	default:
+//		OutputDebugStringW(L"Unknown zip block.\n");
+//		break;
+//	}
+//	DWORD pos = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
+//	if (pos >= fileSize.LowPart) {
+//		OutputDebugStringW(L"File Ended.\n");
+//		break;;
+//	}
+//}
+
+//FileBlockMapType::iterator finded = fileBlockMap.find(entity);
+//if (finded == fileBlockMap.end())
+//{
+//	return nullptr;
+//}
 
 	return nullptr;
 }

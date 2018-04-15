@@ -45,6 +45,15 @@
     <ClInclude Include="ModelPLY.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="PakFileReader.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="SdlParser.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialPly.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine\Game.cpp">
@@ -72,6 +81,15 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="ModelPLY.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="PakFileReader.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="SdlParser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="MaterialPly.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

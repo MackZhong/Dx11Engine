@@ -11,7 +11,7 @@ using namespace DirectX;
 
 using Microsoft::WRL::ComPtr;
 
-static const XMVECTORF32 START_POSITION = { -30.f, -30.0f, -30.f, 0.f };
+static const XMVECTORF32 START_POSITION = { 1.f, 40.0f, 6.f, 0.f };
 static const float ROTATION_GAIN = 0.004f;
 static const float MOVEMENT_GAIN = 0.07f;
 
@@ -293,7 +293,7 @@ void Game_DR::ToggleFullscreen()
 }
 
 Game_DR::Game_DR()
-	:m_pitch(0),
+	:m_pitch(-1.4f),
 	m_yaw(0)
 {
 	m_deviceResources = std::make_unique<DX::DeviceResources>();
@@ -384,7 +384,8 @@ void Game_DR::Update(DX::StepTimer const& timer)
 	if (kb.Home)
 	{
 		m_cameraPos = START_POSITION.v;
-		m_pitch = m_yaw = 0;
+		m_pitch = -1.0f;
+		m_yaw = 1.0f;
 	}
 
 	Vector3 move = Vector3::Zero;
@@ -415,6 +416,10 @@ void Game_DR::Update(DX::StepTimer const& timer)
 
 	m_cameraPos += move;
 
+	wchar_t t[256];
+	StringCchPrintf(t, 255, L"camera pos: %0.1f,%0.1f,%0.1f picth: %0.1f yaw: %0.1f",
+		m_cameraPos.x, m_cameraPos.y, m_cameraPos.z, m_pitch, m_yaw);
+	SetWindowTextW(m_deviceResources->GetWindow(), t);
 	//Vector3 halfBound = (Vector3(ROOM_BOUNDS.v) / Vector3(2.f))
 	//	- Vector3(0.1f, 0.1f, 0.1f);
 
@@ -451,6 +456,7 @@ void Game_DR::Render()
 
 	m_view = XMMatrixLookAtRH(m_cameraPos, lookAt, Vector3::Up);
 
+	context->RSSetState(m_states->CullCounterClockwise());
 	OnRender(context);
 
 	m_deviceResources->PIXEndEvent();

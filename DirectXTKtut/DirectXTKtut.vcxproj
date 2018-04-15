@@ -165,9 +165,12 @@
     <ClInclude Include="Engine\Game.h" />
     <ClInclude Include="Engine\Game_DR.h" />
     <ClInclude Include="Engine\StepTimer.h" />
+    <ClInclude Include="MaterialPly.h" />
     <ClInclude Include="ModelPLY.h" />
+    <ClInclude Include="PakFileReader.h" />
     <ClInclude Include="RenderingModel.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="SdlParser.h" />
     <ClInclude Include="SimpleRendering.h" />
   </ItemGroup>
   <ItemGroup>
@@ -182,8 +185,11 @@
     <ClCompile Include="Engine\Game.cpp" />
     <ClCompile Include="Engine\Game_DR.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="MaterialPly.cpp" />
     <ClCompile Include="ModelPLY.cpp" />
+    <ClCompile Include="PakFileReader.cpp" />
     <ClCompile Include="RenderingModel.cpp" />
+    <ClCompile Include="SdlParser.cpp" />
     <ClCompile Include="SimpleRendering.cpp" />
   </ItemGroup>
   <ItemGroup>

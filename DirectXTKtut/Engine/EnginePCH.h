@@ -32,6 +32,7 @@
 #pragma comment(lib, "Shlwapi.lib")
 #include <wrl/client.h>
 using Microsoft::WRL::ComPtr;
+#include <Strsafe.h>
 
 #include <d3d11_4.h>
 #pragma comment(lib, "d3d11.lib")
@@ -47,6 +48,7 @@ using namespace DirectX;
 #ifdef _DEBUG
 #include <dxgidebug.h>
 #endif
+#include <DirectXPackedVector.h>
 
 #include <algorithm>
 #include <exception>
@@ -55,6 +57,7 @@ using namespace DirectX;
 #include <map>
 #include <list>
 #include <locale>
+#include <sstream>
 
 namespace DX
 {
@@ -92,6 +95,7 @@ namespace DX
 		SafeHandle(HANDLE h) :m_Handle(h) {};
 		~SafeHandle() { CloseHandle(m_Handle); m_Handle = NULL; }
 		operator HANDLE() { return m_Handle; }
+		HANDLE& operator=(HANDLE oth) { m_Handle = oth; return m_Handle; }
 	};
 }
 
