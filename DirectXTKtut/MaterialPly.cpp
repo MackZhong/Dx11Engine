@@ -17,8 +17,8 @@ MaterialPlySimple::~MaterialPlySimple()
 std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device* d3dDevice, LPCWSTR szPakFile, LPCSTR szMatFile)
 {
 	auto fileReader = PakFileReader::GetReader(szPakFile);
-	auto pos = fileReader->FindFilePosition(szMatFile);
-	if (!pos)
+	auto filePos = fileReader->FindFilePosition(szMatFile);
+	if (!filePos)
 		return nullptr;
 
 	DWORD dwErr;
@@ -30,15 +30,17 @@ std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device
 		//return nullptr;
 	}
 
-	LARGE_INTEGER fileSize;
-	if (!GetFileSizeEx(hFile, &fileSize) || fileSize.LowPart < (pos->offset + pos->size)) {
-		dwErr = GetLastError();
-		OutputDebugStringW(L"GetFileSizeEx failed or file size error.\n");
-		throw "GetFileSizeEx failed or file size error";
-		//return nullptr;
-	}
+	//LARGE_INTEGER fileSize;
+	//if (!GetFileSizeEx(hFile, &fileSize) || fileSize.LowPart < (filePos->offset + filePos->size)) {
+	//	dwErr = GetLastError();
+	//	OutputDebugStringW(L"GetFileSizeEx failed or file size error.\n");
+	//	throw "GetFileSizeEx failed or file size error";
+	//	//return nullptr;
+	//}
 
 	DWORD readedBytes;
+	SdlParser parser;
+	Keywords allKeywords("MTL");
 	for (auto m = fileReader->m_FileMap.begin(); m != fileReader->m_FileMap.end(); m++) {
 		if (StrCmpNA(".mtl", PathFindExtensionA((*m).first.c_str()), 4))
 			continue;
@@ -52,7 +54,7 @@ std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device
 
 		SetFilePointer(hFile, pos->offset, nullptr, FILE_BEGIN);
 
-		auto dataPtr = std::make_unique<byte[]>(pos->size);
+		auto dataPtr = std::make_unique<char[]>(pos->size);
 		if (!ReadFile(hFile, dataPtr.get(), pos->size, &readedBytes, NULL)) {
 			dwErr = GetLastError();
 			OutputDebugStringW(L"ReadFile for Local file failed.\n");
@@ -66,10 +68,15 @@ std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device
 
 		ULONG sizeHeader = 4 + sizeof(_ZipLocalFileHeader) + pLF->fname_len + pLF->extra_field_len;
 		readedBytes -= sizeHeader;
-		std::shared_ptr<MaterialPlySimple> material = CreateFromMTL(d3dDevice, dataPtr.get() + sizeHeader, readedBytes);
-		material->name = szMatFile;
+
+		Keywords::KeywordsPtr keywords = parser.Analyse2("MTL", dataPtr.get() + sizeHeader, readedBytes);
+		allKeywords.Combine(keywords.get());
 	}
 
+	OutputDebugStringA("\t\t----====*====----\n\n");
+	std::stringstream stmBuf;
+	stmBuf << allKeywords;
+	OutputDebugStringA(stmBuf.str().c_str());
 
 
 
@@ -82,8 +89,8 @@ std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device
 		//return nullptr;
 	}
 
-	//LARGE_INTEGER fileSize;
-	if (!GetFileSizeEx(hFile, &fileSize) || fileSize.LowPart < (pos->offset + pos->size)) {
+	LARGE_INTEGER fileSize;
+	if (!GetFileSizeEx(hFile, &fileSize) || fileSize.LowPart < (filePos->offset + filePos->size)) {
 		dwErr = GetLastError();
 		OutputDebugStringW(L"GetFileSizeEx failed or file size error.\n");
 		throw "GetFileSizeEx failed or file size error";
@@ -91,10 +98,10 @@ std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device
 	}
 
 	//DWORD readedBytes;
-	SetFilePointer(hFile, pos->offset, nullptr, FILE_BEGIN);
+	SetFilePointer(hFile, filePos->offset, nullptr, FILE_BEGIN);
 
-	auto dataPtr = std::make_unique<byte[]>(pos->size);
-	if (!ReadFile(hFile, dataPtr.get(), pos->size, &readedBytes, NULL)) {
+	auto dataPtr = std::make_unique<char[]>(filePos->size);
+	if (!ReadFile(hFile, dataPtr.get(), filePos->size, &readedBytes, NULL)) {
 		dwErr = GetLastError();
 		OutputDebugStringW(L"ReadFile for Local file failed.\n");
 		throw "ReadFile for Local file failed";
@@ -113,10 +120,10 @@ std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device
 	return material;
 }
 
-std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromMTL(ID3D11Device* d3dDevice, const uint8_t* meshData, size_t dataSize)
+std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromMTL(ID3D11Device* d3dDevice, const char* meshData, size_t dataSize)
 {
 	SdlParser parser;
-	parser.Analyse(meshData, dataSize);
+	parser.Analyse2("MTL", meshData, dataSize);
 
 	return std::make_shared<MaterialPlySimple>();
 }

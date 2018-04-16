@@ -16,6 +16,81 @@ struct SdlStats {
 };
 #pragma pack(pop)
 
+
+class Keywords {
+private:
+	Keywords* Get(std::string kw) {
+		if (kw.empty())
+			return nullptr;
+		if (!m_SubKeywords)
+			return nullptr;
+		auto find = m_SubKeywords->find(kw);
+		if (m_SubKeywords->end() == find)
+			return nullptr;
+		//return nullptr;
+		return (Keywords*)(&(*find));
+	}
+
+public:
+	using KeywordsPtr = std::shared_ptr<Keywords>;
+	using KwSet = std::set<Keywords>;
+	using KwSetPtr = std::shared_ptr<KwSet>;
+	using KwSetIterator = KwSet::iterator;
+
+	Keywords(std::string kw, Keywords* p = nullptr) : m_Name(kw), m_Parent(p) {};
+	KeywordsPtr Parent() { return m_Parent; };
+	KwSetPtr Children() { return m_SubKeywords; };
+
+	Keywords* AddChild(std::string kw) {
+		if (!m_SubKeywords)
+			m_SubKeywords = std::make_shared<KwSet>();
+		if (kw.empty())
+			return nullptr;
+		m_SubKeywords->emplace(kw, this);
+		return (Keywords*)(&(*m_SubKeywords->find(kw)));
+	}
+
+	void Combine(Keywords* const other) {
+		if (this->m_Name != other->m_Name) {
+			throw "Can't combine different keyword set";
+		}
+		if (nullptr == other->m_SubKeywords)
+			return;
+		if (nullptr == this->m_SubKeywords) {
+			this->m_SubKeywords = other->m_SubKeywords;
+			return;
+		}
+
+		for (auto k = other->m_SubKeywords->begin(); k != other->m_SubKeywords->end(); k++) {
+			auto it = this->Get(k->m_Name);
+			if (nullptr == it) {
+				this->m_SubKeywords->emplace(*k);
+			}
+			else {
+				it->Combine(other->Get(k->m_Name));
+			}
+		}
+	}
+
+	bool operator<(const Keywords& right) const { return m_Name < right.m_Name; }
+
+	friend std::ostream& operator<<(std::ostream& os, const Keywords& me) {
+		os << "{ " << me.m_Name;
+		if (me.m_SubKeywords) {
+			for (auto k = me.m_SubKeywords->begin(); k != me.m_SubKeywords->end(); k++) {
+				os << *k;
+			}
+		}
+		os << " }";
+		return os;
+	}
+
+private:
+	KeywordsPtr m_Parent;
+	std::string m_Name;
+	KwSetPtr m_SubKeywords;
+};
+
 class SdlParser
 {
 private:
@@ -88,10 +163,20 @@ private:
 
 	void Analyse(FILE * fpin);
 
+	std::string ReadUntil(char const* pData, ULONG& uPos, size_t stData, char chQuote);
+	std::string ReadDigit(char const* pData, ULONG& uPos, size_t stData);
+	std::string ReadWord(char const* pData, ULONG& uPos, size_t stData);
+
 public:
 	SdlParser();
 	~SdlParser();
 	/**´Ê·¨·ÖÎö**/
-	void Analyse(byte const* data, size_t size);
-};
+	void Analyse(char const* data, size_t size);
 
+	//using KeywordsSet = std::set<KeywordSet>;
+
+	//using KeywordArray = std::vector<std::string>;
+	//using LevelKeywords = std::map<USHORT, KeywordArray>;
+
+	Keywords::KeywordsPtr Analyse2(char const* setName, char const* dataPtr, size_t dataSize);
+};
