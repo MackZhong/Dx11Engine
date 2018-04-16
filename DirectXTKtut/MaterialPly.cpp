@@ -40,9 +40,11 @@ std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device
 
 	DWORD readedBytes;
 	SdlParser parser;
-	Keywords allKeywords("MTL");
+	const char setType[] = "MDL";
+	const char setExt[] = ".mdl";
+	Keywords allKeywords(setType, Keywords::ROOT);
 	for (auto m = fileReader->m_FileMap.begin(); m != fileReader->m_FileMap.end(); m++) {
-		if (StrCmpNA(".mtl", PathFindExtensionA((*m).first.c_str()), 4))
+		if (StrCmpNA(setExt, PathFindExtensionA((*m).first.c_str()), 4))
 			continue;
 
 		OutputDebugStringA((*m).first.c_str());
@@ -69,7 +71,7 @@ std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device
 		ULONG sizeHeader = 4 + sizeof(_ZipLocalFileHeader) + pLF->fname_len + pLF->extra_field_len;
 		readedBytes -= sizeHeader;
 
-		Keywords::KwPtr keywords = parser.Analyse2("MTL", dataPtr.get() + sizeHeader, readedBytes);
+		Keywords::KwPtr keywords = parser.Analyse(setType, dataPtr.get() + sizeHeader, readedBytes);
 		allKeywords.Combine(keywords);
 	}
 
@@ -78,7 +80,8 @@ std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device
 	stmBuf << allKeywords;
 	OutputDebugStringA(stmBuf.str().c_str());
 
-
+	OutputDebugStringA("\n\t\t----====*====----\n\n");
+	OutputDebugStringA(allKeywords.toClass().c_str());
 
 	//DWORD dwErr;
 	//DX::SafeHandle hFile = CreateFileW(szPakFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);

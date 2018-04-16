@@ -20,10 +20,10 @@ void DR_ModelRendering::OnRender(ID3D11DeviceContext1 * context)
 void DR_ModelRendering::OnDeviceDependentResources(ID3D11Device * device)
 {
 	std::shared_ptr<MaterialPlySimple> material = MaterialPlySimple::CreateFromPak(device,
-		L"E:/Games/Men of War Assault Squad/resource/entity/e1.pak", "flora/bush/alder_little/01-material.mtl");
+		L"D:/Games/Men of War Assault Squad 2/resource/entity/e1.pak", "flora/bush/alder_little/01-material.mtl");
 
-	//auto path = std::make_unique<wchar_t[]>(MAX_PATH);D:/Games/Men of War Assault Squad 2
-	//GetCurrentDirectoryW(MAX_PATH, path.get());
+	//auto path = std::make_unique<wchar_t[]>(MAX_PATH);
+	//GetCurrentDirectoryW(MAX_PATH, path.get());E:/Games/Men of War Assault Squad
 	//SetCurrentDirectoryW(L"assets");
 	//m_model = Model::CreateFromCMO(device, L"cup.cmo", *m_fxFactory);
 	//SetCurrentDirectoryW(path.get());

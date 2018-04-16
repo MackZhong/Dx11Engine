@@ -15,198 +15,109 @@ SdlParser::~SdlParser()
 
 std::string SdlParser::MTL_KEYWORDS[KEYWORDS_COUNT] = { "material", "diffuse", "specular", "color", "blend", "tile", "alphatocoverage",
 "AlphaChannel","bump","mask","envmap","MipMap","Axis","diffuse1","Modulate2x","Blend", "height","parallax_scale" };
+
 /**词法分析**/
-void SdlParser::Analyse(char const* data, size_t size) {
-	SdlStats stats;
-	std::wostringstream msgStream;
+Keywords::KwPtr SdlParser::Analyse(char const* setName, char const* dataPtr, size_t dataSize, ParseClient client) {
+	std::string content(dataPtr, dataPtr + dataSize);
+	OutputDebugStringA(content.c_str());
+	OutputDebugStringA("\n\n");
 
-	char ch;
-	UINT32 pos = 0;
-	string word;
+	std::stack <Keywords::KwPtr> kwStack;
+	Keywords::KwPtr curKeyset = std::make_shared<Keywords>(setName, Keywords::ROOT, nullptr);
+	kwStack.push(curKeyset);
 
-	ch = data[0];
-	int iLine = 1;
-	while (pos < size) {	// 开始一行
-		ch = data[pos++];
-		if (!isascii(ch)) {
-			throw "None ascii code not supported";
+	const int MAX_LEVEL = 8;
+	ULONG line = 0;
+	bool isSymbol = false;
+	ULONG pos = 0;
+	std::string word;
+	while (pos < dataSize) {
+		if ('{' == dataPtr[pos]) {
+			pos++;
+			curKeyset.reset();
+			isSymbol = false;
+		}
+		else if ('}' == dataPtr[pos]) {
+			if (client) {
+				client->Process(curKeyset->Name(), word, isSymbol);
+			}
+			pos++;
+			curKeyset = kwStack.top();
+			kwStack.pop();
+		}
+		else if (';' == dataPtr[pos]) {
+			word = ReadUntil(dataPtr, pos, dataSize - pos, 0);
+			OutputDebugStringA("Comment: \"");
+			OutputDebugStringA(word.c_str());
+			OutputDebugStringA("\".\n");
+		}
+		else if ('\'' == dataPtr[pos] || '\"' == dataPtr[pos]) {	// 字符串
+			word = ReadUntil(dataPtr, pos, dataSize - pos, dataPtr[pos]);
+			if (nullptr == curKeyset) {	// 字符串属性
+				curKeyset = kwStack.top()->AddChild(word, Keywords::STR);
+				kwStack.push(curKeyset);
+
+				//bKeywordSet[level] = true;
+				OutputDebugStringA("Property: \"");
+				OutputDebugStringA(word.c_str());
+				OutputDebugStringA("\".\n");
+			}
+			else {						// 字符串值
+				OutputDebugStringA("String: \"");
+				OutputDebugStringA(word.c_str());
+				OutputDebugStringA("\".\n");
+			}
+		}
+		else if ('(' == dataPtr[pos]) {
+			word = ReadUntil(dataPtr, pos, dataSize - pos, ')');
+			ProcessCommand(word);
+		}
+		else if ('.' == dataPtr[pos] || '-' == dataPtr[pos] || isdigit(dataPtr[pos])) {	// 数值
+			word = ReadDigit(dataPtr, pos, dataSize - pos);
+			OutputDebugStringA("Digit: ");
+			OutputDebugStringA(word.c_str());
+			OutputDebugStringA(".\n");
+		}
+		else if (isalpha(dataPtr[pos]) || '_' == dataPtr[pos]) {	// 关键词或者标识符
+			word = ReadWord(dataPtr, pos, dataSize - pos);
+			//if (bKeywordSet[level]) {	
+			if (nullptr == curKeyset) {	// 关键词
+				curKeyset = kwStack.top()->AddChild(word, Keywords::STR);
+				kwStack.push(curKeyset);
+
+				//bKeywordSet[level] = true;
+				OutputDebugStringA("Keyword: ");
+				OutputDebugStringA(word.c_str());
+				OutputDebugStringA(".\n");
+			}
+			else {						// 标识符
+				isSymbol = true;
+				OutputDebugStringA("Symbols: ");
+				OutputDebugStringA(word.c_str());
+				OutputDebugStringA(".\n");
+			}
+		}
+		else if (isprint(dataPtr[pos])) {
+			throw "Unknown syntax.";
 		}
 
-		if (isspace(ch)) {			// 判断是否为分割字符
-			if (stats.inword) {		// 一个单词结束
-				if (!stats.keyget) {	// 关键词
-					if (IsKeyword(word)) {
-						msgStream << L"关键字：" << word.c_str() << endl;
-						stats.keyget = true;
-					}
-					else {
-						throw std::exception("Invalid keyword");
-					}
-				}
-				else {			// 标识符
-					msgStream << L"\t标识符：" << word.c_str() << endl;
-				}
-
-				word.clear();
-				stats.inword = false;
-			}
-			else if (stats.indigit) {	// 数值
-				msgStream << L"\t数值量：" << word.c_str() << endl;
-
-				word.clear();
-				stats.indigit = false;
-				stats.ishex = false;
-			}
-			else if ('\r' == ch || '\n' == ch) {
-				//EndLine();
-
-				if (stats.quart) {
-					throw std::exception("Multiline string not support");
-				}
-				stats.NewToken();		// 行末初始化，不支持分行语句
-				word.clear();
-				while (isspace(data[pos++ + 1])) {}	// 处理多个空行
-			}
-			continue;
+		if ('\r' == dataPtr[pos]) {
+			pos++;
 		}
-		else if (stats.quart == ch) {	// 字符串结束，先处理结束符，可能是空串。文本不应该有“0”值
-			if (word.empty()) {
-				msgStream << L"\t字符串为空" << endl;
-			}
-			else {
-				msgStream << L"\t字符串：" << word.c_str() << "" << endl;
-			}
-
-			stats.quart = 0;
-			word.clear();
-			continue;
-		}
-		else if (stats.quart) {		// 读取字符串
-			if ('\\' == ch) {		// 转义符
-				ch = data[pos++];	// 默认跳过
-			}
-			word += ch;
-
-			continue;
-		}
-		else switch (ch) {
-		case '\r':		// 回车
-		case '\n':		// 换行
+		if ('\n' == dataPtr[pos])
 		{
-			//EndLine();
-
-			if (stats.quart) {
-				throw std::exception("Multiline string not support");
-			}
-			stats.NewToken();		// 行末初始化，不支持分行语句
-			word.clear();
-			while (isspace(data[pos++ + 1])) {}	// 处理多个空行
-
-			continue;
+			pos++;
+			line++;
 		}
-		case ';':	// 注释到行尾
-		{
-			if (stats.indigit || stats.inword || stats.quart) {
-				//EndToken();
-			}
-			do {
-				word += ch;
-				ch = data[pos + 1];
-				if ('\r' != ch || '\n' != ch)
-					break;
-				pos++;
-			} while (true);
-			continue;
-		}
-		case '\'':	// 单引号字符串
-			stats.quart = '\'';
-			continue;
-		case '\"':	// 双引号字符串
-			stats.quart = '\"';
-			continue;
-		case '{':	// 定义块开始
-			stats.level++;
-			stats.NewToken();
-			continue;
-		case '}':	// 定义块结束
-			//if (stats.quart) {
-			//	throw std::exception("Multiline string not support");
-			//}
-			//else if (stats.inword) {
-			//	msgStream << L"关键字：" << word.c_str() << endl;
-			//}
-			//else if (stats.indigit) {
-			//}
-			//stats.NewToken();
-			//EndToken();
-			stats.level--;
-			continue;
-			//case '+':
-			//case '-':
-			//case '*':
-			//case '/':
-			//case '>':
-			//case '<':
-			//case '=':
-			//case '!':
-			//{
-			//	arr += ch;
-			//	//printf("%3d    ", value(SDL_OPERATOR, _countof(SDL_OPERATOR), *arr.data()));
-			//	cout << arr << "  运算符" << endl;
-			//	break;
-			//}
-			//case ',':
-			//case '(':
-			//case ')':
-			//case '[':
-			//case ']':
-			//{
-			//	arr += ch;
-			//	printf("%3d    ", value(SDL_SEPARATER, 8, *arr.data()));
-			//	cout << arr << "  分隔符" << endl;
-			//	break;
-			//}
-		default:
-			break;
-		}
-
-		if (stats.inword && (isalnum(ch) || '_' == ch)) {     // 判断是否为有效标识符
-			word += ch;
-
-			continue;
-		}
-		else if (!stats.inword && !stats.indigit && isalpha(ch)) {       // 判断是否为有效标识符
-			stats.inword = true;
-			word += ch;
-
-			continue;
-		}
-		else if (stats.indigit) {
-			if ((stats.ishex && isxdigit(ch)) ||
-				(!stats.ishex && (isdigit(ch) || '.' == ch || (isspace(data[pos + 1]) && ('f' == ch || 'F' == ch))))) {
-				word += ch;
-			}
-			else {
-				throw std::bad_exception();
-			}
-
-			continue;
-		}
-		else if (isdigit(ch)) {           //判断是否为数字
-			stats.ishex = ('0' == ch && (data[pos + 1] == 'x' || data[pos + 1] == 'X'));
-			stats.indigit = true;
-
-			word += ch;
-
-			continue;
-		}
-		else {
-			msgStream << L"无法识别的字符：\'" << ch << "\':！" << endl;
-			OutputDebugStringW(msgStream.str().c_str());
-			throw std::exception("Unknown character.");
+		// 上述方式可以同时处理Windows和Linux的两种CRLF方式
+		while (pos < dataSize && isspace(dataPtr[pos])) {
+			pos++;
 		}
 	}
-	OutputDebugStringW(msgStream.str().c_str());
+
+	curKeyset = kwStack.top();
+	kwStack.pop();
+	return curKeyset;
 }
 
 std::string SdlParser::ReadUntil(char const* pData, ULONG& uPos, size_t stData, char chQuote)
@@ -241,7 +152,15 @@ std::string SdlParser::ReadDigit(char const* pData, ULONG& uPos, size_t stData)
 	ULONG uStart = uPos;
 	bool isHex = false;
 	bool hasDot = false;
-	if ('0' == pData[uPos]) {
+	if ('.' == pData[uPos]) {
+		hasDot = true;
+		uPos++;
+	}
+	else if ('-' == pData[uPos])
+	{
+		uPos++;
+	}
+	else if ('0' == pData[uPos]) {
 		if (('x' == pData[uPos + 1] || 'X' == pData[uPos + 1])) {
 			isHex = true;
 			uPos += 2;
@@ -253,7 +172,7 @@ std::string SdlParser::ReadDigit(char const* pData, ULONG& uPos, size_t stData)
 	}
 
 	while ((isHex && isxdigit(pData[uPos]))		// 十六进制
-		|| (!isHex && (('.' == pData[uPos] && !hasDot) || isdigit(pData[uPos])))		// 十进制
+		|| (!isHex && (('.' == pData[uPos] && !hasDot) || isdigit(pData[uPos]) || 'e' == pData[uPos] || ('-' == pData[uPos] && 'e' == pData[uPos - 1])))		// 十进制
 		|| ((isspace(pData[uPos + 1]) || '}' == pData[uPos + 1]) && ('f' == pData[uPos] || 'F' == pData[uPos]))	// 末尾浮点数标记
 		) {
 		if ('.' == pData[uPos] && !hasDot) {
@@ -297,33 +216,46 @@ std::string SdlParser::ReadWord(char const* pData, ULONG& uPos, size_t stData)
 	return std::string(pData + uStart, pData + uPos);
 }
 
+void SdlParser::ProcessCommand(std::string const& command)
+{
+	// TODO:
+	return;
+}
+
 Keywords::KwPtr SdlParser::Analyse2(char const* setName, char const* dataPtr, size_t dataSize)
 {
-	const int MAX_LEVEL = 8;
-	USHORT level = 0;
-	ULONG line = 0;
-	bool bKeywordSet[MAX_LEVEL]{ 0 };
+	std::stack <Keywords::KwPtr> kwStack;
+	Keywords::KwPtr curKeyset = std::make_shared<Keywords>(setName, Keywords::ROOT, nullptr);
+	kwStack.push(curKeyset);
 
-	auto keywords = std::make_shared<Keywords>(setName);
+	const int MAX_LEVEL = 8;
+	//USHORT level = 0;
+	ULONG line = 0;
+	//bool bKeywordSet[MAX_LEVEL]{ 0 };
+
+	//auto keywords = std::make_shared<Keywords>(setName);
 
 	ULONG pos = 0;
 	std::string word;
 	while (pos < dataSize) {
 		if ('{' == dataPtr[pos]) {
 			pos++;
-			level++;
-			bKeywordSet[level] = false;
+			curKeyset.reset();
+			//level++;
+			//bKeywordSet[level] = false;
 		}
 		else if ('}' == dataPtr[pos]) {
-			if (!bKeywordSet[level]) {
-				throw "Keyword not set";
-			}
+			//if (!bKeywordSet[level]) {
+			//	throw "Keyword not set";
+			//}
 			pos++;
-			for (int l = level; l < MAX_LEVEL; l++) {
-				bKeywordSet[l] = false;
-			}
-			level--;
-			keywords = keywords->Parent();
+			//for (int l = level; l < MAX_LEVEL; l++) {
+			//	bKeywordSet[l] = false;
+			//}
+			//level--;
+			//keywords = keywords->Parent();
+			curKeyset = kwStack.top();
+			kwStack.pop();
 		}
 		else if (';' == dataPtr[pos]) {
 			word = ReadUntil(dataPtr, pos, dataSize - pos, 0);
@@ -333,9 +265,22 @@ Keywords::KwPtr SdlParser::Analyse2(char const* setName, char const* dataPtr, si
 		}
 		else if ('\'' == dataPtr[pos] || '\"' == dataPtr[pos]) {	// 字符串
 			word = ReadUntil(dataPtr, pos, dataSize - pos, dataPtr[pos]);
-			OutputDebugStringA("String: \"");
-			OutputDebugStringA(word.c_str());
-			OutputDebugStringA("\".\n");
+			if (nullptr == curKeyset) {	// 字符串属性
+				curKeyset = kwStack.top()->AddChild(word, Keywords::STR);
+				kwStack.push(curKeyset);
+
+				//bKeywordSet[level] = true;
+				OutputDebugStringA("Keyword: ");
+				OutputDebugStringA(word.c_str());
+
+				OutputDebugStringA(" appended");
+				OutputDebugStringA(".\n");
+			}
+			else {						// 字符串值
+				OutputDebugStringA("String: \"");
+				OutputDebugStringA(word.c_str());
+				OutputDebugStringA("\".\n");
+			}
 		}
 		else if (isdigit(dataPtr[pos])) {	// 数值
 			word = ReadDigit(dataPtr, pos, dataSize - pos);
@@ -345,20 +290,22 @@ Keywords::KwPtr SdlParser::Analyse2(char const* setName, char const* dataPtr, si
 		}
 		else if (isalpha(dataPtr[pos]) || '_' == dataPtr[pos]) {	// 关键词或者标识符
 			word = ReadWord(dataPtr, pos, dataSize - pos);
-			if (bKeywordSet[level]) {	// 标识符
-				OutputDebugStringA("Symbols: \"");
-				OutputDebugStringA(word.c_str());
-				OutputDebugStringA("\".\n");
-			}
-			else {						// 关键词
-				bKeywordSet[level] = true;
+			//if (bKeywordSet[level]) {	
+			if (nullptr == curKeyset) {	// 关键词
+				curKeyset = kwStack.top()->AddChild(word, Keywords::STR);
+				kwStack.push(curKeyset);
+
+				//bKeywordSet[level] = true;
 				OutputDebugStringA("Keyword: ");
 				OutputDebugStringA(word.c_str());
 
-				auto k = keywords->AddChild(word);
-				keywords.swap( k);// keywords->AddChild(word);
 				OutputDebugStringA(" appended");
 				OutputDebugStringA(".\n");
+			}
+			else {						// 标识符
+				OutputDebugStringA("Symbols: \"");
+				OutputDebugStringA(word.c_str());
+				OutputDebugStringA("\".\n");
 			}
 		}
 
@@ -376,10 +323,13 @@ Keywords::KwPtr SdlParser::Analyse2(char const* setName, char const* dataPtr, si
 		}
 	}
 
-	return keywords;
+	curKeyset = kwStack.top();
+	kwStack.pop();
+	return curKeyset;
 }
 
 void SdlParser::Analyse(FILE * fpin)
 {
 
 }
+

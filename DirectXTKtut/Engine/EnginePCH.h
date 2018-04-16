@@ -58,6 +58,7 @@ using namespace DirectX;
 #include <list>
 #include <locale>
 #include <sstream>
+#include <stack>
 
 namespace DX
 {

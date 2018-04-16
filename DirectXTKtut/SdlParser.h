@@ -2,6 +2,13 @@
 
 using namespace std;
 
+class IParseClient {
+public:
+	virtual void Process(std::string const& keyword, std::string const& value = "", bool isSymbol = false) = 0;
+};
+
+using ParseClient = std::shared_ptr<IParseClient>;
+
 #pragma pack(push, 1)
 struct SdlStats {
 	USHORT level{ 0 };
@@ -19,16 +26,27 @@ struct SdlStats {
 
 class Keywords {
 private:
+	Keywords() {};
 
 public:
+	enum KeyType {
+		ROOT = 'r',
+		KEY = 'k',
+		STR = 'p'
+	};
+	enum ValueType {
+		STRING = 0x0,
+		DIGIT = 0x0,
+		OBJECT = 0x0,
+	};
 	using KwPtr = std::shared_ptr<Keywords>;
 	using KwMap = std::map<std::string, KwPtr>;
 	using KwMapPtr = std::shared_ptr<KwMap>;
 	//using KwSetIterator = KwMap::iterator;
 
-	Keywords(std::string const& kw, Keywords* const& p = nullptr) : m_Name(kw), m_Parent(p) {};
-	KwPtr Parent() { return m_Parent; };
-	//KwMapPtr Children() { return m_SubKeywords; };
+	Keywords(std::string const& kw, KeyType kt, Keywords* const& p = nullptr) : m_Name(kw), m_KeyType(kt), m_Parent(p) {};
+	Keywords* Parent() { return m_Parent; };
+	std::string Name() { return m_Name; };
 
 	KwPtr Get(const std::string& kw) {
 		if (kw.empty() || m_SubKeywords.empty())
@@ -40,13 +58,13 @@ public:
 		return m_SubKeywords.find(kw)->second;
 	}
 
-	KwPtr AddChild(const std::string& kw) {
+	KwPtr AddChild(const std::string& kw, KeyType kt) {
 		if (kw.empty())
 			return nullptr;
 		//if (!m_SubKeywords)
 		//	m_SubKeywords = std::make_shared<KwMap>();
 		if (m_SubKeywords.find(kw) == m_SubKeywords.end()) {
-			m_SubKeywords.emplace(kw, std::make_shared<Keywords>(kw, this));
+			m_SubKeywords.emplace(kw, std::make_shared<Keywords>(kw, kt, this));
 		}
 		return m_SubKeywords.at(kw);
 	}
@@ -55,21 +73,25 @@ public:
 		if (this->m_Name != other->m_Name) {
 			throw "Can't combine different keyword set";
 		}
-		if (other->m_SubKeywords.empty())
-			return;
-		if (this->m_SubKeywords.empty()) {
-			this->m_SubKeywords = other->m_SubKeywords;
-			return;
-		}
+		//if (other->m_SubKeywords.empty())
+		//	return;
+		//if (this->m_SubKeywords.empty()) {
+		//	this->m_SubKeywords = other->m_SubKeywords;
+		//	return;
+		//}
 
 		for (auto k = other->m_SubKeywords.begin(); k != other->m_SubKeywords.end(); k++) {
-			auto me = this->Get(k->first);
-			if (nullptr == me) {
-				auto added = this->m_SubKeywords.emplace(k->first, k->second);
-				added.first->second->m_Parent = me;
+			auto me = this->m_SubKeywords.find(k->first);
+			if (this->m_SubKeywords.end() == me) {
+				auto ist = this->m_SubKeywords.insert(*k);
+				auto sec = ist.first->second;
+				sec->m_Parent = this;
+				//auto added = this->m_SubKeywords.emplace(k->first, k->second);
+				//added.first->second->m_Parent = me;
 			}
 			else {
-				me->Combine(k->second);
+				//me->Combine(k->second);
+				me->second->Combine(k->second);
 			}
 		}
 	}
@@ -77,16 +99,46 @@ public:
 	bool operator<(const Keywords& right) const { return m_Name < right.m_Name; }
 
 	friend std::ostream& operator<<(std::ostream& os, const Keywords& me) {
-		os << "{ " << me.m_Name;
+		os << "{ " << me.m_Name << "(" << (char)me.m_KeyType << ") " << std::endl;
 		for (auto k = me.m_SubKeywords.begin(); k != me.m_SubKeywords.end(); k++) {
-			os << *(k->second);
+			os << "\t" << *(k->second);
 		}
-		os << " }";
+		os << " }" << std::endl;
 		return os;
 	}
 
+	std::string toClass(int level = 0) {
+		std::stringstream stm;
+		std::string preSpace;
+		for (int l = 0; l < level; l++) { preSpace += '\t'; }
+		stm << preSpace;
+
+		if (m_SubKeywords.empty())
+		{
+			stm << "int " << m_Name << ";" << std::endl;
+			return stm.str();
+		}
+
+		if (ROOT == m_KeyType) {
+			stm << "namespace ";
+		}
+		else {
+			stm << "class ";
+		}
+		stm << m_Name << " {" << std::endl;
+
+		for (auto k = m_SubKeywords.begin(); k != m_SubKeywords.end(); k++) {
+			stm << k->second->toClass(level + 1);
+		}
+
+		stm << preSpace << "};" << std::endl;
+
+		return stm.str();
+	}
+
 private:
-	KwPtr m_Parent;
+	Keywords * m_Parent;
+	KeyType m_KeyType;
 	std::string m_Name;
 	KwMap m_SubKeywords;
 };
@@ -96,70 +148,6 @@ class SdlParser
 private:
 	const static int KEYWORDS_COUNT = 18;
 	static string MTL_KEYWORDS[KEYWORDS_COUNT];
-	//static char SDL_SEPARATER[];
-	//static char SDL_FILTER[];
-	//const int IDENTIFIER = 100;         //标识符值  
-	//const int CONSTANT = 101;           //常数值  
-	//const int FILTER_VALUE = 102;       //过滤字符值
-
-	/**判断是否为关键字**/
-	bool IsKeyword(string word) {
-		for (int i = 0; i < KEYWORDS_COUNT; i++) {
-			if (MTL_KEYWORDS[i] == word) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	///**判断是否为分隔符**/
-	//bool IsSeparater(char ch) {
-	//	for (int i = 0; i < _countof(SDL_SEPARATER); i++) {
-	//		if (SDL_SEPARATER[i] == ch) {
-	//			return true;
-	//		}
-	//	}
-	//	return false;
-	//}
-
-	///**判断是否为运算符**/
-	//bool IsOperator(char ch) {
-	//	for (int i = 0; i < 8; i++) {
-	//		if (OPERATOR[i] == ch) {
-	//			return true;
-	//		}
-	//	}
-	//	return false;
-	//}
-
-	///**判断是否为过滤符**/
-	//bool IsFilter(char ch) {
-	//	for (int i = 0; i < _countof(SDL_FILTER); i++) {
-	//		if (SDL_FILTER[i] == ch) {
-	//			return true;
-	//		}
-	//	}
-	//	return false;
-	//}
-
-	///**判断是否为大写字母**/
-	//bool IsUpLetter(char ch) {
-	//	return (ch >= 'A' && ch <= 'Z');
-	//}
-
-	///**判断是否为数字**/
-	//bool IsDigit(char ch) {
-	//	return (ch >= '0' && ch <= '9');
-	//}
-
-	///**返回每个字的值**/
-	//template <class T>
-	//int value(T *a, int n, T str) {
-	//	for (int i = 0; i < n; i++) {
-	//		if (a[i] == str) return i + 1;
-	//	}
-	//	return -1;
-	//}
 
 	void Analyse(FILE * fpin);
 
@@ -167,16 +155,13 @@ private:
 	std::string ReadDigit(char const* pData, ULONG& uPos, size_t stData);
 	std::string ReadWord(char const* pData, ULONG& uPos, size_t stData);
 
+	void ProcessCommand(std::string const& command);
 public:
 	SdlParser();
 	~SdlParser();
+
 	/**词法分析**/
-	void Analyse(char const* data, size_t size);
-
-	//using KeywordsSet = std::set<KeywordSet>;
-
-	//using KeywordArray = std::vector<std::string>;
-	//using LevelKeywords = std::map<USHORT, KeywordArray>;
+	Keywords::KwPtr Analyse(char const* setName, char const* dataPtr, size_t dataSize, ParseClient client = nullptr);
 
 	Keywords::KwPtr Analyse2(char const* setName, char const* dataPtr, size_t dataSize);
 };
