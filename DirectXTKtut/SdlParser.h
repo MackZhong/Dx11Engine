@@ -19,55 +19,57 @@ struct SdlStats {
 
 class Keywords {
 private:
-	Keywords* Get(std::string kw) {
-		if (kw.empty())
-			return nullptr;
-		if (!m_SubKeywords)
-			return nullptr;
-		auto find = m_SubKeywords->find(kw);
-		if (m_SubKeywords->end() == find)
-			return nullptr;
-		//return nullptr;
-		return (Keywords*)(&(*find));
-	}
 
 public:
-	using KeywordsPtr = std::shared_ptr<Keywords>;
-	using KwSet = std::set<Keywords>;
-	using KwSetPtr = std::shared_ptr<KwSet>;
-	using KwSetIterator = KwSet::iterator;
+	using KwPtr = std::shared_ptr<Keywords>;
+	using KwMap = std::map<std::string, KwPtr>;
+	using KwMapPtr = std::shared_ptr<KwMap>;
+	//using KwSetIterator = KwMap::iterator;
 
-	Keywords(std::string kw, Keywords* p = nullptr) : m_Name(kw), m_Parent(p) {};
-	KeywordsPtr Parent() { return m_Parent; };
-	KwSetPtr Children() { return m_SubKeywords; };
+	Keywords(std::string const& kw, Keywords* const& p = nullptr) : m_Name(kw), m_Parent(p) {};
+	KwPtr Parent() { return m_Parent; };
+	//KwMapPtr Children() { return m_SubKeywords; };
 
-	Keywords* AddChild(std::string kw) {
-		if (!m_SubKeywords)
-			m_SubKeywords = std::make_shared<KwSet>();
-		if (kw.empty())
+	KwPtr Get(const std::string& kw) {
+		if (kw.empty() || m_SubKeywords.empty())
 			return nullptr;
-		m_SubKeywords->emplace(kw, this);
-		return (Keywords*)(&(*m_SubKeywords->find(kw)));
+		//auto find = ;
+		//if (m_SubKeywords.end() == find)
+		//	return nullptr;
+		//return nullptr;
+		return m_SubKeywords.find(kw)->second;
 	}
 
-	void Combine(Keywords* const other) {
+	KwPtr AddChild(const std::string& kw) {
+		if (kw.empty())
+			return nullptr;
+		//if (!m_SubKeywords)
+		//	m_SubKeywords = std::make_shared<KwMap>();
+		if (m_SubKeywords.find(kw) == m_SubKeywords.end()) {
+			m_SubKeywords.emplace(kw, std::make_shared<Keywords>(kw, this));
+		}
+		return m_SubKeywords.at(kw);
+	}
+
+	void Combine(const KwPtr& other) {
 		if (this->m_Name != other->m_Name) {
 			throw "Can't combine different keyword set";
 		}
-		if (nullptr == other->m_SubKeywords)
+		if (other->m_SubKeywords.empty())
 			return;
-		if (nullptr == this->m_SubKeywords) {
+		if (this->m_SubKeywords.empty()) {
 			this->m_SubKeywords = other->m_SubKeywords;
 			return;
 		}
 
-		for (auto k = other->m_SubKeywords->begin(); k != other->m_SubKeywords->end(); k++) {
-			auto it = this->Get(k->m_Name);
-			if (nullptr == it) {
-				this->m_SubKeywords->emplace(*k);
+		for (auto k = other->m_SubKeywords.begin(); k != other->m_SubKeywords.end(); k++) {
+			auto me = this->Get(k->first);
+			if (nullptr == me) {
+				auto added = this->m_SubKeywords.emplace(k->first, k->second);
+				added.first->second->m_Parent = me;
 			}
 			else {
-				it->Combine(other->Get(k->m_Name));
+				me->Combine(k->second);
 			}
 		}
 	}
@@ -76,19 +78,17 @@ public:
 
 	friend std::ostream& operator<<(std::ostream& os, const Keywords& me) {
 		os << "{ " << me.m_Name;
-		if (me.m_SubKeywords) {
-			for (auto k = me.m_SubKeywords->begin(); k != me.m_SubKeywords->end(); k++) {
-				os << *k;
-			}
+		for (auto k = me.m_SubKeywords.begin(); k != me.m_SubKeywords.end(); k++) {
+			os << *(k->second);
 		}
 		os << " }";
 		return os;
 	}
 
 private:
-	KeywordsPtr m_Parent;
+	KwPtr m_Parent;
 	std::string m_Name;
-	KwSetPtr m_SubKeywords;
+	KwMap m_SubKeywords;
 };
 
 class SdlParser
@@ -178,5 +178,5 @@ public:
 	//using KeywordArray = std::vector<std::string>;
 	//using LevelKeywords = std::map<USHORT, KeywordArray>;
 
-	Keywords::KeywordsPtr Analyse2(char const* setName, char const* dataPtr, size_t dataSize);
+	Keywords::KwPtr Analyse2(char const* setName, char const* dataPtr, size_t dataSize);
 };

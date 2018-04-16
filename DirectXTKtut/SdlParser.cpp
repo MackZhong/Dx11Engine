@@ -297,7 +297,7 @@ std::string SdlParser::ReadWord(char const* pData, ULONG& uPos, size_t stData)
 	return std::string(pData + uStart, pData + uPos);
 }
 
-Keywords::Keywords* SdlParser::Analyse2(char const* setName, char const* dataPtr, size_t dataSize)
+Keywords::KwPtr SdlParser::Analyse2(char const* setName, char const* dataPtr, size_t dataSize)
 {
 	const int MAX_LEVEL = 8;
 	USHORT level = 0;
@@ -305,7 +305,6 @@ Keywords::Keywords* SdlParser::Analyse2(char const* setName, char const* dataPtr
 	bool bKeywordSet[MAX_LEVEL]{ 0 };
 
 	auto keywords = std::make_shared<Keywords>(setName);
-	Keywords* currentKey = nullptr;
 
 	ULONG pos = 0;
 	std::string word;
@@ -324,7 +323,7 @@ Keywords::Keywords* SdlParser::Analyse2(char const* setName, char const* dataPtr
 				bKeywordSet[l] = false;
 			}
 			level--;
-			currentKey = currentKey->Parent();
+			keywords = keywords->Parent();
 		}
 		else if (';' == dataPtr[pos]) {
 			word = ReadUntil(dataPtr, pos, dataSize - pos, 0);
@@ -356,8 +355,8 @@ Keywords::Keywords* SdlParser::Analyse2(char const* setName, char const* dataPtr
 				OutputDebugStringA("Keyword: ");
 				OutputDebugStringA(word.c_str());
 
-				currentKey = currentKey->AddChild(word);
-
+				auto k = keywords->AddChild(word);
+				keywords.swap( k);// keywords->AddChild(word);
 				OutputDebugStringA(" appended");
 				OutputDebugStringA(".\n");
 			}

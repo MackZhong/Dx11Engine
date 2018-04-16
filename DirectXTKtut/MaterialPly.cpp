@@ -69,8 +69,8 @@ std::shared_ptr<MaterialPlySimple> MaterialPlySimple::CreateFromPak(ID3D11Device
 		ULONG sizeHeader = 4 + sizeof(_ZipLocalFileHeader) + pLF->fname_len + pLF->extra_field_len;
 		readedBytes -= sizeHeader;
 
-		Keywords::KeywordsPtr keywords = parser.Analyse2("MTL", dataPtr.get() + sizeHeader, readedBytes);
-		allKeywords.Combine(keywords.get());
+		Keywords::KwPtr keywords = parser.Analyse2("MTL", dataPtr.get() + sizeHeader, readedBytes);
+		allKeywords.Combine(keywords);
 	}
 
 	OutputDebugStringA("\t\t----====*====----\n\n");
