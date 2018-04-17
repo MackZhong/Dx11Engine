@@ -32,11 +32,11 @@
     <ClCompile Include="MowParser.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="reserved_word.cpp.txt">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="pakreader.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="reserved_word.cpp.txt" />
   </ItemGroup>
 </Project>

@@ -4,48 +4,48 @@
 #pragma pack(push, 2)
 __declspec(align(2)) struct _ZipLocalFileHeader
 {
-	WORD version;
-	WORD bitflags;
-	WORD comp_method;
-	WORD lastModFileTime;
-	WORD lastModFileDate;
-	DWORD crc_32;
-	DWORD comp_size;
-	DWORD uncompr_size;
-	WORD fname_len;
-	WORD extra_field_len;
+	unsigned short version;
+	unsigned short bitflags;
+	unsigned short comp_method;
+	unsigned short lastModFileTime;
+	unsigned short lastModFileDate;
+	unsigned long crc_32;
+	unsigned long comp_size;
+	unsigned long uncompr_size;
+	unsigned short fname_len;
+	unsigned short extra_field_len;
 };
 
 __declspec(align(2)) struct _ZipCDFHeader
 {
-	WORD version_madeby;
-	WORD version_needed;
-	WORD bitflags;
-	WORD comp_method;
-	WORD lastModFileTime;
-	WORD lastModFileDate;
-	DWORD crc_32;
-	DWORD comp_size;
-	DWORD uncompr_size;
-	WORD fname_len;
-	WORD extra_field_len;
-	WORD fcomment_len;
-	WORD disk_num_start;
-	WORD internal_fattribute;
-	DWORD external_fattribute;
-	DWORD relative_offset;
+	unsigned short version_madeby;
+	unsigned short version_needed;
+	unsigned short bitflags;
+	unsigned short comp_method;
+	unsigned short lastModFileTime;
+	unsigned short lastModFileDate;
+	unsigned long crc_32;
+	unsigned long comp_size;
+	unsigned long uncompr_size;
+	unsigned short fname_len;
+	unsigned short extra_field_len;
+	unsigned short fcomment_len;
+	unsigned short disk_num_start;
+	unsigned short internal_fattribute;
+	unsigned long external_fattribute;
+	unsigned long relative_offset;
 };
 
 __declspec(align(2)) struct _ZipEOCD	//Offset Bytes Description
 {
 	//0	4	End of central directory signature = 0x06054b50
-	WORD numOfDisk;					//4	2	Number of this disk
-	WORD diskCDStart;					//6	2	Disk where central directory starts
-	WORD numOfCD;						//8	2	Number of central directory records on this disk
-	WORD numTotalCD;					//10 2	Total number of central directory records
-	DWORD sizeCD;						//12 4	Size of central directory(bytes)
-	DWORD offsetCDStart;				//16 4	Offset of start of central directory, relative to start of archive
-	WORD lenComment;					//20 2	Comment length(n)
+	unsigned short numOfDisk;					//4	2	Number of this disk
+	unsigned short diskCDStart;					//6	2	Disk where central directory starts
+	unsigned short numOfCD;						//8	2	Number of central directory records on this disk
+	unsigned short numTotalCD;					//10 2	Total number of central directory records
+	unsigned long sizeCD;						//12 4	Size of central directory(bytes)
+	unsigned long offsetCDStart;				//16 4	Offset of start of central directory, relative to start of archive
+	unsigned short lenComment;					//20 2	Comment length(n)
 										//22 n	Comment
 };
 #pragma pack(pop)
