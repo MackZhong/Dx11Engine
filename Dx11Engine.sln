@@ -20,6 +20,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTKtut", "DirectXTKtu
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PakAnalyzer", "PakAnalyzer\PakAnalyzer.vcxproj", "{6D6856B6-F9D2-490A-A0D4-D50F80824F6D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MowParser", "MowParser\MowParser.vcxproj", "{C6CDB4F9-B7A8-44EB-9C75-72BE126D1A59}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -84,6 +86,14 @@ Global
 		{6D6856B6-F9D2-490A-A0D4-D50F80824F6D}.Release|Win32.Build.0 = Release|Win32
 		{6D6856B6-F9D2-490A-A0D4-D50F80824F6D}.Release|x64.ActiveCfg = Release|x64
 		{6D6856B6-F9D2-490A-A0D4-D50F80824F6D}.Release|x64.Build.0 = Release|x64
+		{C6CDB4F9-B7A8-44EB-9C75-72BE126D1A59}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C6CDB4F9-B7A8-44EB-9C75-72BE126D1A59}.Debug|Win32.Build.0 = Debug|Win32
+		{C6CDB4F9-B7A8-44EB-9C75-72BE126D1A59}.Debug|x64.ActiveCfg = Debug|x64
+		{C6CDB4F9-B7A8-44EB-9C75-72BE126D1A59}.Debug|x64.Build.0 = Debug|x64
+		{C6CDB4F9-B7A8-44EB-9C75-72BE126D1A59}.Release|Win32.ActiveCfg = Release|Win32
+		{C6CDB4F9-B7A8-44EB-9C75-72BE126D1A59}.Release|Win32.Build.0 = Release|Win32
+		{C6CDB4F9-B7A8-44EB-9C75-72BE126D1A59}.Release|x64.ActiveCfg = Release|x64
+		{C6CDB4F9-B7A8-44EB-9C75-72BE126D1A59}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
